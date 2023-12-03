@@ -29,6 +29,7 @@
 #include "ftl/ftl.hh"
 #include "pal/pal.hh"
 
+
 namespace SimpleSSD {
 
 namespace FTL {
@@ -57,6 +58,8 @@ class PageMapping : public AbstractFTL {
     uint64_t reclaimedBlocks;
     uint64_t validSuperPageCopies;
     uint64_t validPageCopies;
+    uint64_t erasedTotalBlocks;
+    uint64_t testThirdParty;
   } stat;
 
   float freeBlockRatio();

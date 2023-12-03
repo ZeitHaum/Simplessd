@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 #include "hil/nvme/interface.hh"
 #include "hil/nvme/ocssd.hh"

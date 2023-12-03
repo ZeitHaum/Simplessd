@@ -25,6 +25,7 @@
 
 #include "util/algorithm.hh"
 #include "util/bitset.hh"
+#include "lib/mytest/testclass.cc"
 
 namespace SimpleSSD {
 
@@ -77,6 +78,9 @@ bool PageMapping::initialize() {
   Request req(param.ioUnitInPage);
 
   debugprint(LOG_FTL_PAGE_MAPPING, "Initialization started");
+  mytest::TestClass tc = mytest::TestClass();
+  tc.setIntToMax(stat.testThirdParty);
+  debugprint(LOG_FTL_PAGE_MAPPING, std::to_string(stat.testThirdParty).c_str());
 
   nTotalLogicalPages = param.totalLogicalBlocks * param.pagesInBlock;
   nPagesToWarmup =
@@ -859,6 +863,7 @@ void PageMapping::eraseInternal(PAL::Request &req, uint64_t &tick) {
   block->second.erase();
 
   pPAL->erase(req, tick);
+  ++stat.erasedTotalBlocks;
 
   // Check erase count
   uint32_t erasedCount = block->second.getEraseCount();
@@ -962,6 +967,16 @@ void PageMapping::getStatList(std::vector<Stats> &list, std::string prefix) {
   temp.name = prefix + "page_mapping.wear_leveling";
   temp.desc = "Wear-leveling factor";
   list.push_back(temp);
+
+  //Add by ZeitHaum
+  temp.name = prefix + "page_mapping.gc.erasedTotalBlocks";
+  temp.desc = "Total erased blocks during GC";
+  list.push_back(temp);
+
+  //Add by ZeitHaum
+  temp.name = prefix + "page_mapping.testThirdParty";
+  temp.desc = "Test Included Files of ThirdParty";
+  list.push_back(temp);
 }
 
 void PageMapping::getStatValues(std::vector<double> &values) {
@@ -970,6 +985,8 @@ void PageMapping::getStatValues(std::vector<double> &values) {
   values.push_back(stat.validSuperPageCopies);
   values.push_back(stat.validPageCopies);
   values.push_back(calculateWearLeveling());
+  values.push_back(stat.erasedTotalBlocks);
+  values.push_back(stat.testThirdParty);
 }
 
 void PageMapping::resetStatValues() {
