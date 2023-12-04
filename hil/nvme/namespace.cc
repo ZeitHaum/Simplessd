@@ -437,6 +437,7 @@ void Namespace::read(SQEntryWrapper &req, RequestFunction &func) {
       pContext->buffer = (uint8_t *)calloc(pContext->nlb, info.lbaSize);
 
       if (pDisk) {
+        debugprint(LOG_HIL_NVME, "READ OCCURED IN LINE 440!");
         pDisk->read(pContext->slba, pContext->nlb, pContext->buffer);
       }
 
@@ -542,6 +543,7 @@ void Namespace::compare(SQEntryWrapper &req, RequestFunction &func) {
       pContext->hostContent = (uint8_t *)calloc(pContext->nlb, info.lbaSize);
 
       if (pDisk) {
+        debugprint(LOG_HIL_NVME, "READ OCCURED IN LINE 545!");
         pDisk->read(pContext->slba, pContext->nlb, pContext->buffer);
       }
 

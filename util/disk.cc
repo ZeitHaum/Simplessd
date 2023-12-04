@@ -28,6 +28,11 @@
 #include <unistd.h>
 #endif
 
+// #define DEBUG
+#ifdef DEBUG
+#include "sim/trace.hh"
+#endif
+
 namespace SimpleSSD {
 
 Disk::Disk() : diskSize(0), sectorSize(0) {}
@@ -150,7 +155,9 @@ uint16_t Disk::read(uint64_t slba, uint16_t nlblk, uint8_t *buffer) {
 
     ret = nlblk;
   }
-
+  #ifdef DEBUG
+  debugprint(LOG_COMMON, ("DISK TEST READ" + std::to_string(ret)).c_str());
+  #endif
   return ret;
 }
 
@@ -169,12 +176,11 @@ uint16_t Disk::write(uint64_t slba, uint16_t nlblk, uint8_t *buffer) {
     disk.write((char *)buffer, sectorSize * nlblk);
     offset = (uint64_t)disk.tellp() - offset;
 
-    // DPRINTF(NVMeDisk, "DISK    | WRITE | BYTE %016" PRIX64 " + %X\n", slba,
-    //         offset);
-
     ret = offset / sectorSize;
   }
-
+  #ifdef DEBUG
+  debugprint(LOG_COMMON, ("DISK TEST WRITE" + std::to_string(ret)).c_str());
+  #endif
   return ret;
 }
 
@@ -208,7 +214,9 @@ uint16_t CoWDisk::read(uint64_t slba, uint16_t nlblk, uint8_t *buffer) {
       read += Disk::read(slba + i, 1, buffer + i * sectorSize);
     }
   }
-
+  #ifdef DEBUG
+  debugprint(LOG_COMMON, ("COWDISK TEST READ" + std::to_string(read)).c_str());
+  #endif
   return read;
 }
 
@@ -232,7 +240,9 @@ uint16_t CoWDisk::write(uint64_t slba, uint16_t nlblk, uint8_t *buffer) {
 
     write++;
   }
-
+  #ifdef DEBUG
+  debugprint(LOG_COMMON, ("COWDISK TEST WRITE" + std::to_string(write)).c_str());
+  #endif
   return write;
 }
 
@@ -268,7 +278,9 @@ uint16_t MemDisk::read(uint64_t slba, uint16_t nlblk, uint8_t *buffer) {
 
     read++;
   }
-
+  #ifdef DEBUG
+  debugprint(LOG_COMMON, ("MEMDISK TEST READ" + std::to_string(read)).c_str());
+  #endif
   return read;
 }
 
@@ -292,7 +304,9 @@ uint16_t MemDisk::write(uint64_t slba, uint16_t nlblk, uint8_t *buffer) {
 
     write++;
   }
-
+  #ifdef DEBUG
+  debugprint(LOG_COMMON, ("MEMDISK TEST WRITE" + std::to_string(write)).c_str());
+  #endif
   return write;
 }
 uint16_t MemDisk::erase(uint64_t slba, uint16_t nlblk) {
