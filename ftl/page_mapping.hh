@@ -39,8 +39,7 @@ class PageMapping : public AbstractFTL {
   PAL::PAL *pPAL;
 
   ConfigReader &conf;
-
-  std::unordered_map<uint64_t, std::vector<std::pair<uint32_t, uint32_t>>>
+  std::unordered_map<uint64_t, std::vector<std::tuple<uint32_t, uint32_t, uint32_t>>>
       table;
   std::unordered_map<uint32_t, Block> blocks;
   std::list<Block> freeBlocks;
@@ -61,6 +60,12 @@ class PageMapping : public AbstractFTL {
     uint64_t erasedTotalBlocks;
     uint64_t testThirdParty;
   } stat;
+
+  struct CompressInfo{
+    uint32_t is_compressed : 1;
+    uint32_t c_ind : 3;
+    uint32_t offset : 28;
+  };
 
   float freeBlockRatio();
   uint32_t convertBlockIdx(uint32_t);

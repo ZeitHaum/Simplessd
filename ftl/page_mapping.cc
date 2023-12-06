@@ -249,16 +249,16 @@ void PageMapping::format(LPNRange &range, uint64_t &tick) {
       // Do trim
       for (uint32_t idx = 0; idx < bitsetSize; idx++) {
         auto &mapping = mappingList.at(idx);
-        auto block = blocks.find(mapping.first);
+        auto block = blocks.find(std::get<0>(mapping));
 
         if (block == blocks.end()) {
           panic("Block is not in use");
         }
 
-        block->second.invalidate(mapping.second, idx);
+        block->second.invalidate(std::get<1>(mapping), idx);
 
         // Collect block indices
-        list.push_back(mapping.first);
+        list.push_back(std::get<0>(mapping));
       }
 
       iter = table.erase(iter);
@@ -540,6 +540,11 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
         // Update mapping table
         uint32_t newBlockIdx = freeBlock->first;
 
+        bool is_filled = true;
+        uint32_t nowPageCnt = 0;
+        uint32_t nowPageIdx = 0;
+        uint32_t nowOffset = 0;
+
         for (uint32_t idx = 0; idx < bitsetSize; idx++) {
           if (bit.test(idx)) {
             // Invalidate
@@ -551,20 +556,41 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
               panic("Invalid mapping table entry");
             }
 
-            pDRAM->read(&(*mappingList), 8 * param.ioUnitInPage, tick);
+            pDRAM->read(&(*mappingList), 12 * param.ioUnitInPage, tick);
 
             auto &mapping = mappingList->second.at(idx);
+            CompressInfo* c_info = (CompressInfo*) &(std::get<2>(mapping));
+            if(c_info -> is_compressed == 0x1){
+              nowPageIdx = freeBlock->second.getNextWritePageIndex(idx);
+              is_filled = true;
+              std::get<0>(mapping) = newBlockIdx;
+              std::get<1>(mapping) = nowPageIdx;
+              //DONOTHING ON Compressed Info.
+            }
+            else{
+              if(is_filled){
+                nowPageIdx = freeBlock->second.getNextWritePageIndex(idx);
+                nowPageCnt = 0;
+                nowOffset = 0;
+                is_filled = false;
+              }
+              std::get<0>(mapping) = newBlockIdx;
+              std::get<1>(mapping) = nowPageIdx;
+              int CompressedLength = param.pageSize / 2; // TODO: Change it to true Size
+              c_info->is_compressed = 0x1;
+              c_info->c_ind = nowPageCnt++;
+              c_info->offset = nowOffset;
+              nowOffset += CompressedLength;
+              //TODO: CHANGE LOGIC OF ISFILLED
+              is_filled = nowOffset >= param.pageSize;
+              debugprint(LOG_FTL_PAGE_MAPPING, (std::to_string(std::get<29>(mapping))).c_str());
+            }
 
-            uint32_t newPageIdx = freeBlock->second.getNextWritePageIndex(idx);
-
-            mapping.first = newBlockIdx;
-            mapping.second = newPageIdx;
-
-            freeBlock->second.write(newPageIdx, lpns.at(idx), idx, beginAt);
+            freeBlock->second.write(nowPageIdx, lpns.at(idx), idx, beginAt);
 
             // Issue Write
             req.blockIndex = newBlockIdx;
-            req.pageIndex = newPageIdx;
+            req.pageIndex = nowPageIdx;
 
             if (bRandomTweak) {
               req.ioFlag.reset();
@@ -631,20 +657,20 @@ void PageMapping::readInternal(Request &req, uint64_t &tick) {
 
   if (mappingList != table.end()) {
     if (bRandomTweak) {
-      pDRAM->read(&(*mappingList), 8 * req.ioFlag.count(), tick);
+      pDRAM->read(&(*mappingList), 12 * req.ioFlag.count(), tick);
     }
     else {
-      pDRAM->read(&(*mappingList), 8, tick);
+      pDRAM->read(&(*mappingList), 12, tick);
     }
 
     for (uint32_t idx = 0; idx < bitsetSize; idx++) {
       if (req.ioFlag.test(idx) || !bRandomTweak) {
         auto &mapping = mappingList->second.at(idx);
 
-        if (mapping.first < param.totalPhysicalBlocks &&
-            mapping.second < param.pagesInBlock) {
-          palRequest.blockIndex = mapping.first;
-          palRequest.pageIndex = mapping.second;
+        if (std::get<0>(mapping) < param.totalPhysicalBlocks &&
+            std::get<1>(mapping) < param.pagesInBlock) {
+          palRequest.blockIndex = std::get<0>(mapping);
+          palRequest.pageIndex = std::get<1>(mapping);
 
           if (bRandomTweak) {
             palRequest.ioFlag.reset();
@@ -664,6 +690,13 @@ void PageMapping::readInternal(Request &req, uint64_t &tick) {
 
           block->second.read(palRequest.pageIndex, idx, beginAt);
           pPAL->read(palRequest, beginAt);
+
+          //DECOMPRESSE
+          CompressInfo* c_info = (CompressInfo*)(&(std::get<2>(mapping)));
+          if(c_info -> is_compressed){
+            //TODO: DECOMPRESS LOGIC
+          }
+          debugprint(LOG_FTL_PAGE_MAPPING,("Compressed info: IsCompressed = " + std::to_string(c_info->is_compressed) + ", C_IND = "+ std::to_string(c_info->c_ind) + ", OFFSET = "+ std::to_string(c_info->offset)).c_str());
 
           finishedAt = MAX(finishedAt, beginAt);
         }
@@ -688,12 +721,12 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
       if (req.ioFlag.test(idx) || !bRandomTweak) {
         auto &mapping = mappingList->second.at(idx);
 
-        if (mapping.first < param.totalPhysicalBlocks &&
-            mapping.second < param.pagesInBlock) {
-          block = blocks.find(mapping.first);
+        if (std::get<0>(mapping) < param.totalPhysicalBlocks &&
+            std::get<1>(mapping) < param.pagesInBlock) {
+          block = blocks.find(std::get<0>(mapping));
 
           // Invalidate current page
-          block->second.invalidate(mapping.second, idx);
+          block->second.invalidate(std::get<1>(mapping), idx);
         }
       }
     }
@@ -702,8 +735,8 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
     // Create empty mapping
     auto ret = table.emplace(
         req.lpn,
-        std::vector<std::pair<uint32_t, uint32_t>>(
-            bitsetSize, {param.totalPhysicalBlocks, param.pagesInBlock}));
+        std::vector<std::tuple<uint32_t, uint32_t, uint32_t>>(
+            bitsetSize, {param.totalPhysicalBlocks, param.pagesInBlock, 0x0}));
 
     if (!ret.second) {
       panic("Failed to insert new mapping");
@@ -721,12 +754,12 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
 
   if (sendToPAL) {
     if (bRandomTweak) {
-      pDRAM->read(&(*mappingList), 8 * req.ioFlag.count(), tick);
-      pDRAM->write(&(*mappingList), 8 * req.ioFlag.count(), tick);
+      pDRAM->read(&(*mappingList), 12 * req.ioFlag.count(), tick);
+      pDRAM->write(&(*mappingList), 12 * req.ioFlag.count(), tick);
     }
     else {
-      pDRAM->read(&(*mappingList), 8, tick);
-      pDRAM->write(&(*mappingList), 8, tick);
+      pDRAM->read(&(*mappingList), 12, tick);
+      pDRAM->write(&(*mappingList), 12, tick);
     }
   }
 
@@ -748,8 +781,8 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
       // Maybe some other init procedures want to perform 'partial-write'
       // So check sendToPAL variable
       if (readBeforeWrite && sendToPAL) {
-        palRequest.blockIndex = mapping.first;
-        palRequest.pageIndex = mapping.second;
+        palRequest.blockIndex = std::get<0>(mapping);
+        palRequest.pageIndex = std::get<1>(mapping);
 
         // We don't need to read old data
         palRequest.ioFlag = req.ioFlag;
@@ -759,8 +792,8 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
       }
 
       // update mapping to table
-      mapping.first = block->first;
-      mapping.second = pageIndex;
+      std::get<0>(mapping) = block->first;
+      std::get<1>(mapping) = pageIndex;
 
       if (sendToPAL) {
         palRequest.blockIndex = block->first;
@@ -820,22 +853,22 @@ void PageMapping::trimInternal(Request &req, uint64_t &tick) {
 
   if (mappingList != table.end()) {
     if (bRandomTweak) {
-      pDRAM->read(&(*mappingList), 8 * req.ioFlag.count(), tick);
+      pDRAM->read(&(*mappingList), 12 * req.ioFlag.count(), tick);
     }
     else {
-      pDRAM->read(&(*mappingList), 8, tick);
+      pDRAM->read(&(*mappingList), 12, tick);
     }
 
     // Do trim
     for (uint32_t idx = 0; idx < bitsetSize; idx++) {
       auto &mapping = mappingList->second.at(idx);
-      auto block = blocks.find(mapping.first);
+      auto block = blocks.find(std::get<0>(mapping));
 
       if (block == blocks.end()) {
         panic("Block is not in use");
       }
 
-      block->second.invalidate(mapping.second, idx);
+      block->second.invalidate(std::get<1>(mapping), idx);
     }
 
     // Remove mapping
