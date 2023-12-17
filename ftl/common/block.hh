@@ -39,12 +39,18 @@ class Block {
   // Following variables are used when ioUnitInPage == 1
   Bitset *pValidBits;
   Bitset *pErasedBits;
+  //Unused;
   uint64_t *pLPNs;
 
   // Following variables are used when ioUnitInPage > 1
   std::vector<Bitset> validBits;
   std::vector<Bitset> erasedBits;
-  uint64_t **ppLPNs;
+  // ppLPNs[i][j]表示第i个物理页第j个压缩块的LPN.
+  uint64_t **ppLPNs; 
+  // pppLPNs[i][j][k]表示第i个物理页第j个ioUnit第k个压缩块的LPN.
+  uint64_t ***pppLPNs;
+
+  uint8_t maxCompressedPageCount;
 
   uint64_t lastAccessed;
   uint32_t eraseCount;

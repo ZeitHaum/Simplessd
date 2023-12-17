@@ -34,13 +34,18 @@ Block::Block(uint32_t blockIdx, uint32_t count, uint32_t ioUnit)
       pErasedBits(nullptr),
       pLPNs(nullptr),
       ppLPNs(nullptr),
+      pppLPNs(nullptr),
+      maxCompressedPageCount(8),
       lastAccessed(0),
       eraseCount(0) {
   if (ioUnitInPage == 1) {
     pValidBits = new Bitset(pageCount);
     pErasedBits = new Bitset(pageCount);
 
-    pLPNs = (uint64_t *)calloc(pageCount, sizeof(uint64_t));
+    ppLPNs = (uint64_t **)calloc(pageCount, sizeof(uint64_t*));
+    for(uint32_t i = 0; i<pageCount; i++){
+      ppLPNs[i] = (uint64_t* ) calloc(maxCompressedPageCount, sizeof(uint64_t *));
+    }
   }
   else if (ioUnitInPage > 1) {
     Bitset copy(ioUnitInPage);

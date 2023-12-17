@@ -62,9 +62,10 @@ class PageMapping : public AbstractFTL {
   } stat;
 
   struct CompressInfo{
-    uint32_t is_compressed : 1;
-    uint32_t c_ind : 3;
-    uint32_t offset : 28;
+    uint64_t is_compressed : 1;
+    uint64_t c_ind : 3;// max 8 block in a physical page
+    uint64_t offset : 30;
+    uint64_t length : 30;
   };
 
   float freeBlockRatio();

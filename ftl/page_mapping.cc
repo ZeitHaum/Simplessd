@@ -27,6 +27,8 @@
 #include "util/bitset.hh"
 #include "lib/mytest/testclass.cc"
 
+#define DEBUG_TEST
+
 namespace SimpleSSD {
 
 namespace FTL {
@@ -580,10 +582,12 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
               c_info->is_compressed = 0x1;
               c_info->c_ind = nowPageCnt++;
               c_info->offset = nowOffset;
+              assert(CompressedLength <= (1 << 30));
+              c_info->length = CompressedLength;
               nowOffset += CompressedLength;
               //TODO: CHANGE LOGIC OF ISFILLED
               is_filled = nowOffset >= param.pageSize;
-              debugprint(LOG_FTL_PAGE_MAPPING, (std::to_string(std::get<29>(mapping))).c_str());
+              debugprint(LOG_FTL_PAGE_MAPPING, (std::to_string(std::get<2>(mapping))).c_str());
             }
 
             freeBlock->second.write(nowPageIdx, lpns.at(idx), idx, beginAt);
@@ -653,6 +657,23 @@ void PageMapping::readInternal(Request &req, uint64_t &tick) {
   uint64_t beginAt;
   uint64_t finishedAt = tick;
 
+  #ifdef DEBUG_TEST
+    /*
+    Test 1 Begin
+    GarbageCollection 0 Block.
+    And Read.
+    */
+    Request test_req = Request(param.ioUnitInPage);
+    test_req.lpn = 0;
+    readInternal(test_req, tick);
+    vector<uint32_t> bl(1, 0);
+    doGarbageCollection(bl, tick);
+    readInternal(test_req, tick);
+    /*
+    Test 1 End
+    */
+  #endif
+
   auto mappingList = table.find(req.lpn);
 
   if (mappingList != table.end()) {
@@ -696,7 +717,7 @@ void PageMapping::readInternal(Request &req, uint64_t &tick) {
           if(c_info -> is_compressed){
             //TODO: DECOMPRESS LOGIC
           }
-          debugprint(LOG_FTL_PAGE_MAPPING,("Compressed info: IsCompressed = " + std::to_string(c_info->is_compressed) + ", C_IND = "+ std::to_string(c_info->c_ind) + ", OFFSET = "+ std::to_string(c_info->offset)).c_str());
+          debugprint(LOG_FTL_PAGE_MAPPING,("Compressed info: IsCompressed = " + std::to_string(c_info->is_compressed) + ", C_IND = "+ std::to_string(c_info->c_ind) + ", OFFSET = "+ std::to_string(c_info->offset) + ", LENGTH = " + std::to_string(c_info->length)).c_str());
 
           finishedAt = MAX(finishedAt, beginAt);
         }
