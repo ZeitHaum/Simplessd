@@ -36,10 +36,24 @@ namespace FTL {
 
 class PageMapping : public AbstractFTL {
  private:
+  struct CompressInfo{
+    uint64_t is_compressed : 1;
+    uint64_t c_ind : 3;// max 8 block in a physical page
+    uint64_t idx : 8;
+    uint64_t offset : 26;
+    uint64_t length : 26;
+    CompressInfo():
+    is_compressed(0),
+    c_ind(0),
+    idx(0),
+    offset(0),
+    length(0)
+    {}
+  };
   PAL::PAL *pPAL;
 
   ConfigReader &conf;
-  std::unordered_map<uint64_t, std::vector<std::tuple<uint32_t, uint32_t, uint32_t>>>
+  std::unordered_map<uint64_t, std::vector<std::tuple<uint32_t, uint32_t, CompressInfo>>>
       table;
   std::unordered_map<uint32_t, Block> blocks;
   std::list<Block> freeBlocks;
@@ -60,13 +74,6 @@ class PageMapping : public AbstractFTL {
     uint64_t erasedTotalBlocks;
     uint64_t testThirdParty;
   } stat;
-
-  struct CompressInfo{
-    uint64_t is_compressed : 1;
-    uint64_t c_ind : 3;// max 8 block in a physical page
-    uint64_t offset : 30;
-    uint64_t length : 30;
-  };
 
   float freeBlockRatio();
   uint32_t convertBlockIdx(uint32_t);

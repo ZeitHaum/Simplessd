@@ -193,6 +193,51 @@ void PageMapping::read(Request &req, uint64_t &tick) {
   uint64_t begin = tick;
 
   if (req.ioFlag.count() > 0) {
+    #ifdef DEBUG_TEST
+      /*
+      Test 1 Begin
+      GarbageCollection 0 Block.
+      And Read.
+      *//*
+      Test 1 Begin
+      GarbageCollection 0 Block.
+      And Read.
+      */
+      Request test_req = Request(param.ioUnitInPage);
+      test_req.lpn = 0;
+      test_req.ioFlag.set();
+      readInternal(test_req, tick);
+      vector<uint32_t> bl(1, 0);
+      doGarbageCollection(bl, tick);
+      readInternal(test_req, tick);
+      /*
+      Test 1 End
+      */
+      /*
+      Test 2 Begin
+      Multi Read And Write And Compress On Logic Block 0.
+      */
+      // Request test_req = Request(param.ioUnitInPage);
+      // test_req.lpn = 0;
+      // test_req.ioFlag.set();
+      // readInternal(test_req, tick);
+      // vector<uint32_t> bl(1, 0);
+      // doGarbageCollection(bl, tick);
+      // // Repeat Write
+      // Request test_write_req = Request(param.ioUnitInPage);
+      // test_write_req.lpn = 0;
+      // for(uint32_t idx = 0; idx < 8; idx++){
+      //   test_write_req.ioFlag.set(idx);
+      // }
+      // writeInternal(test_write_req, tick);
+      // readInternal(test_req, tick);
+      // bl[0] = 9537;
+      // doGarbageCollection(bl, tick);
+      // readInternal(test_req, tick);
+      /*
+      Test 2 End
+      */
+    #endif
     readInternal(req, tick);
 
     debugprint(LOG_FTL_PAGE_MAPPING,
@@ -513,6 +558,29 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
     return;
   }
 
+  WriteInfo w_info;
+  
+  auto write_submit = [&](WriteInfo& w_info, std::unordered_map<uint32_t, Block>::iterator freeBlock){
+    // Block
+    assert(w_info.valid);
+    freeBlock->second.write(w_info);
+    req.blockIndex = freeBlock->first;
+    req.pageIndex = w_info.pageIndex;
+
+    if (bRandomTweak) {
+      req.ioFlag.reset();
+      req.ioFlag.set(w_info.idx);
+    }
+    else {
+      req.ioFlag.set();
+    }
+
+    writeRequests.push_back(req);
+    //Clear W_info
+    w_info.valid = false;
+    w_info.lpns.clear();
+  };
+
   // For all blocks to reclaim, collecting request structure only
   for (auto &iter : blocksToReclaim) {
     auto block = blocks.find(iter);
@@ -522,6 +590,7 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
     }
 
     // Copy valid pages to free block
+    // TODO: 由于LastFreeBlock的机制不允许跨块压缩, 是否可以改进?
     for (uint32_t pageIndex = 0; pageIndex < param.pagesInBlock; pageIndex++) {
       // Valid?
       if (block->second.getPageInfo(pageIndex, lpns, bit)) {
@@ -563,18 +632,32 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
             auto &mapping = mappingList->second.at(idx);
             CompressInfo* c_info = (CompressInfo*) &(std::get<2>(mapping));
             if(c_info -> is_compressed == 0x1){
+              if(w_info.valid){
+                write_submit(w_info, freeBlock);
+              }
               nowPageIdx = freeBlock->second.getNextWritePageIndex(idx);
               is_filled = true;
               std::get<0>(mapping) = newBlockIdx;
               std::get<1>(mapping) = nowPageIdx;
+              w_info.idx = idx;
+              w_info.beginAt = beginAt;
+              w_info.pageIndex = nowPageIdx;
+              block->second.getLPNs(pageIndex, w_info.lpns, idx);
+              w_info.valid = true;
+              write_submit(w_info, freeBlock);
               //DONOTHING ON Compressed Info.
             }
             else{
               if(is_filled){
+                if(w_info.valid) write_submit(w_info, freeBlock);
                 nowPageIdx = freeBlock->second.getNextWritePageIndex(idx);
                 nowPageCnt = 0;
                 nowOffset = 0;
                 is_filled = false;
+                w_info.valid = true;
+                w_info.pageIndex = nowPageIdx;
+                w_info.idx = idx;
+                w_info.beginAt = beginAt;
               }
               std::get<0>(mapping) = newBlockIdx;
               std::get<1>(mapping) = nowPageIdx;
@@ -582,35 +665,23 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
               c_info->is_compressed = 0x1;
               c_info->c_ind = nowPageCnt++;
               c_info->offset = nowOffset;
-              assert(CompressedLength <= (1 << 30));
+              assert(CompressedLength <= (1 << 28));
               c_info->length = CompressedLength;
+              c_info->idx = w_info.idx;
               nowOffset += CompressedLength;
               //TODO: CHANGE LOGIC OF ISFILLED
               is_filled = nowOffset >= param.pageSize;
-              debugprint(LOG_FTL_PAGE_MAPPING, (std::to_string(std::get<2>(mapping))).c_str());
+              vector<uint64_t> t_lpn;
+              block->second.getLPNs(pageIndex, t_lpn, idx);
+              assert(t_lpn.size() == 1);
+              w_info.lpns.push_back(t_lpn[0]);
             }
 
-            freeBlock->second.write(nowPageIdx, lpns.at(idx), idx, beginAt);
-
-            // Issue Write
-            req.blockIndex = newBlockIdx;
-            req.pageIndex = nowPageIdx;
-
-            if (bRandomTweak) {
-              req.ioFlag.reset();
-              req.ioFlag.set(idx);
-            }
-            else {
-              req.ioFlag.set();
-            }
-
-            writeRequests.push_back(req);
-
-            stat.validPageCopies++;
+            stat.validPageCopies++;//Invalid
           }
         }
 
-        stat.validSuperPageCopies++;
+        stat.validSuperPageCopies++;//Invalid
       }
     }
 
@@ -657,23 +728,6 @@ void PageMapping::readInternal(Request &req, uint64_t &tick) {
   uint64_t beginAt;
   uint64_t finishedAt = tick;
 
-  #ifdef DEBUG_TEST
-    /*
-    Test 1 Begin
-    GarbageCollection 0 Block.
-    And Read.
-    */
-    Request test_req = Request(param.ioUnitInPage);
-    test_req.lpn = 0;
-    readInternal(test_req, tick);
-    vector<uint32_t> bl(1, 0);
-    doGarbageCollection(bl, tick);
-    readInternal(test_req, tick);
-    /*
-    Test 1 End
-    */
-  #endif
-
   auto mappingList = table.find(req.lpn);
 
   if (mappingList != table.end()) {
@@ -692,10 +746,13 @@ void PageMapping::readInternal(Request &req, uint64_t &tick) {
             std::get<1>(mapping) < param.pagesInBlock) {
           palRequest.blockIndex = std::get<0>(mapping);
           palRequest.pageIndex = std::get<1>(mapping);
-
+          CompressInfo* c_info = (CompressInfo*)(&(std::get<2>(mapping)));
           if (bRandomTweak) {
             palRequest.ioFlag.reset();
-            palRequest.ioFlag.set(idx);
+            if(c_info -> is_compressed){
+              palRequest.ioFlag.set(c_info->idx);
+            }
+            else palRequest.ioFlag.set(idx);
           }
           else {
             palRequest.ioFlag.set();
@@ -713,9 +770,8 @@ void PageMapping::readInternal(Request &req, uint64_t &tick) {
           pPAL->read(palRequest, beginAt);
 
           //DECOMPRESSE
-          CompressInfo* c_info = (CompressInfo*)(&(std::get<2>(mapping)));
-          if(c_info -> is_compressed){
-            //TODO: DECOMPRESS LOGIC
+          if(c_info->is_compressed){
+            
           }
           debugprint(LOG_FTL_PAGE_MAPPING,("Compressed info: IsCompressed = " + std::to_string(c_info->is_compressed) + ", C_IND = "+ std::to_string(c_info->c_ind) + ", OFFSET = "+ std::to_string(c_info->offset) + ", LENGTH = " + std::to_string(c_info->length)).c_str());
 
@@ -756,8 +812,8 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
     // Create empty mapping
     auto ret = table.emplace(
         req.lpn,
-        std::vector<std::tuple<uint32_t, uint32_t, uint32_t>>(
-            bitsetSize, {param.totalPhysicalBlocks, param.pagesInBlock, 0x0}));
+        std::vector<std::tuple<uint32_t, uint32_t, CompressInfo>>(
+            bitsetSize, {param.totalPhysicalBlocks, param.pagesInBlock, CompressInfo()}));
 
     if (!ret.second) {
       panic("Failed to insert new mapping");
@@ -795,8 +851,10 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
       auto &mapping = mappingList->second.at(idx);
 
       beginAt = tick;
-
-      block->second.write(pageIndex, req.lpn, idx, beginAt);
+      
+      //first write, write 0;
+      vector<uint64_t> lpns(1, req.lpn);
+      block->second.write(pageIndex, lpns, idx, beginAt);
 
       // Read old data if needed (Only executed when bRandomTweak = false)
       // Maybe some other init procedures want to perform 'partial-write'

@@ -29,6 +29,17 @@ namespace SimpleSSD {
 
 namespace FTL {
 
+struct WriteInfo{
+  bool valid;
+  uint32_t pageIndex;
+  std::vector<uint64_t> lpns;
+  uint32_t idx;
+  uint64_t beginAt;
+  WriteInfo():
+    valid(false)
+  {}
+};
+
 class Block {
  private:
   uint32_t idx;
@@ -46,9 +57,14 @@ class Block {
   std::vector<Bitset> validBits;
   std::vector<Bitset> erasedBits;
   // ppLPNs[i][j]表示第i个物理页第j个压缩块的LPN.
+  std::vector<vector<Bitset>> cvalidBits;
   uint64_t **ppLPNs; 
   // pppLPNs[i][j][k]表示第i个物理页第j个ioUnit第k个压缩块的LPN.
   uint64_t ***pppLPNs;
+
+  uint8_t *pLPCs;//每个物理页中存储的逻辑页数量(可能被压缩过)
+
+  uint8_t **ppLPCs; //每个物理页中存储的逻辑页数量(可能被压缩过)
 
   uint8_t maxCompressedPageCount;
 
@@ -73,8 +89,11 @@ class Block {
   uint32_t getNextWritePageIndex();
   uint32_t getNextWritePageIndex(uint32_t);
   bool getPageInfo(uint32_t, std::vector<uint64_t> &, Bitset &);
+  void getLPNs(uint32_t, std::vector<uint64_t>&, uint32_t);
   bool read(uint32_t, uint32_t, uint64_t);
-  bool write(uint32_t, uint64_t, uint32_t, uint64_t);
+  // bool write(uint32_t, uint64_t, uint32_t, uint64_t);
+  bool write(uint32_t, std::vector<uint64_t>&, uint32_t, uint64_t);
+  bool write(WriteInfo&);
   void erase();
   void invalidate(uint32_t, uint32_t);
 };

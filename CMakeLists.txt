@@ -46,6 +46,10 @@ if (NOT EXISTS "${PROJECT_SOURCE_DIR}/lib/mytest/testclass.h")
   message(FATAL_ERROR "Failed to find mytest library. \
 Check you initialized submodules.")
 endif ()
+if (NOT EXISTS "${PROJECT_SOURCE_DIR}/lib/lz4/lib/lz4.h")
+  message(FATAL_ERROR "Failed to find mytest library. \
+Check you initialized submodules.")
+endif ()
 
 # Add subproject
 add_subdirectory(${PROJECT_SOURCE_DIR}/lib/mcpat)
@@ -58,6 +62,7 @@ include_directories(
   ${PROJECT_SOURCE_DIR}/lib/mcpat/cacti
   ${PROJECT_SOURCE_DIR}/lib/inih
   ${PROJECT_SOURCE_DIR}/lib/mytest
+  ${PROJECT_SOURCE_DIR}/lib/lz4/lib
   ${DRAMPOWER_SOURCE_DIR}
 )
 
@@ -167,6 +172,7 @@ set(SRC_UTIL
   util/fifo.cc
   util/interface.cc
   util/simplessd.cc
+  util/compressor.cc
 )
 
 # Source group for MSVC
@@ -202,4 +208,14 @@ add_library(simplessd STATIC
   ${SRC_SIM}
   ${SRC_UTIL}
 )
-target_link_libraries(simplessd mcpat mytest)
+
+add_custom_target(lz4_
+    COMMAND make -C ${CMAKE_SOURCE_DIR}/lib/lz4
+)
+add_library (
+  lz4 STATIC ${PROJECT_SOURCE_DIR}/lib/lz4/lib/lz4
+)
+
+add_dependencies(simplessd lz4)
+
+target_link_libraries(simplessd mcpat mytest lz4)

@@ -27,6 +27,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <util/compressor.hh>
 
 namespace SimpleSSD {
 
@@ -35,7 +36,7 @@ class Disk {
   std::string filename;
   uint64_t diskSize;
   uint32_t sectorSize;
-
+  Compressor* compressor;
   std::fstream disk;
 
  public:
