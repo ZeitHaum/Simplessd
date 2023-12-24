@@ -33,11 +33,22 @@ struct WriteInfo{
   bool valid;
   uint32_t pageIndex;
   std::vector<uint64_t> lpns;
+  std::vector<uint64_t> invalidate_idxs;
+  std::vector<uint64_t> invalidate_blocks;
+  std::vector<uint64_t> invalidate_pages;
   uint32_t idx;
+  uint32_t validcount;
   uint64_t beginAt;
-  WriteInfo():
-    valid(false)
-  {}
+  Bitset validmask;
+  uint8_t maxCompressedPageCount;
+  WriteInfo(uint8_t mcpn):
+    valid(false), 
+    validcount(0),
+    maxCompressedPageCount(mcpn)
+  {
+    lpns = std::vector<uint64_t>(8, 0);
+    validmask = Bitset(maxCompressedPageCount);
+  }
 };
 
 class Block {
@@ -47,24 +58,20 @@ class Block {
   uint32_t ioUnitInPage;
   uint32_t *pNextWritePageIndex;
 
-  // Following variables are used when ioUnitInPage == 1
+  //Unused
   Bitset *pValidBits;
-  Bitset *pErasedBits;
-  //Unused;
   uint64_t *pLPNs;
+  // Following variables are used when ioUnitInPage == 1
+  Bitset *pErasedBits;
+  std::vector<Bitset> validBits;
+  uint64_t **ppLPNs; 
 
   // Following variables are used when ioUnitInPage > 1
-  std::vector<Bitset> validBits;
   std::vector<Bitset> erasedBits;
   // ppLPNs[i][j]表示第i个物理页第j个压缩块的LPN.
-  std::vector<vector<Bitset>> cvalidBits;
-  uint64_t **ppLPNs; 
+  std::vector<std::vector<Bitset>> cvalidBits;
   // pppLPNs[i][j][k]表示第i个物理页第j个ioUnit第k个压缩块的LPN.
   uint64_t ***pppLPNs;
-
-  uint8_t *pLPCs;//每个物理页中存储的逻辑页数量(可能被压缩过)
-
-  uint8_t **ppLPCs; //每个物理页中存储的逻辑页数量(可能被压缩过)
 
   uint8_t maxCompressedPageCount;
 
@@ -89,13 +96,14 @@ class Block {
   uint32_t getNextWritePageIndex();
   uint32_t getNextWritePageIndex(uint32_t);
   bool getPageInfo(uint32_t, std::vector<uint64_t> &, Bitset &);
-  void getLPNs(uint32_t, std::vector<uint64_t>&, uint32_t);
+  void getLPNs(uint32_t, std::vector<uint64_t>&, Bitset& bits, uint32_t);
   bool read(uint32_t, uint32_t, uint64_t);
   // bool write(uint32_t, uint64_t, uint32_t, uint64_t);
-  bool write(uint32_t, std::vector<uint64_t>&, uint32_t, uint64_t);
+  bool write(uint32_t, std::vector<uint64_t>&, Bitset& , uint32_t, uint64_t);
   bool write(WriteInfo&);
   void erase();
   void invalidate(uint32_t, uint32_t);
+  void invalidate(uint32_t, uint32_t, uint8_t);
 };
 
 }  // namespace FTL

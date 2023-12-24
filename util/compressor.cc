@@ -1,6 +1,8 @@
 //Compressor, author: ZeitHaum.
 #include "util/compressor.hh"
-#include "lib/lz4/lib/lz4.h"
+extern "C"{
+    #include "lib/lz4/lib/lz4.h"
+}
 #include "string.h"
 
 Compressor::Compressor()
@@ -28,22 +30,17 @@ inline int LZ4Compressor::getMaxDecompressLen(uint64_t decomp_len){
 }
 
 inline int LZ4Compressor::getMaxCompressLen(uint64_t comp_len){
-    // return (int) LZ4_compressBound((int)comp_len);
-    return comp_len;
+    return (int) LZ4_compressBound((int)comp_len);
 }
 
 void LZ4Compressor::compress(uint8_t* src, uint64_t src_len, uint64_t& dest_len){
     int max_compresslen = getMaxCompressLen(src_len);
     this->ajustBuffer(max_compresslen);
-    memcpy(this->buffer, src, src_len);
-    dest_len = (int) ((double)src_len * 0.45);
-    // dest_len = LZ4_compress_default((char*)src, (char*)this->buffer, (int)src_len, max_compresslen);
+    dest_len = LZ4_compress_default((char*)src, (char*)this->buffer, (int)src_len, max_compresslen);
 }
 
 void LZ4Compressor::decompress(uint8_t* src, uint64_t src_len, uint64_t& dest_len){
     int max_decompresslen = getMaxDecompressLen(src_len);
     this->ajustBuffer(max_decompresslen);
-    memcpy(this->buffer, src, src_len);
-    dest_len = (int) ((double) src_len / 0.45) ;
-    // dest_len = LZ4_decompress_safe((char*)src, (char*) this->buffer, (int)src_len, max_decompresslen);
+    dest_len = LZ4_decompress_safe((char*)src, (char*) this->buffer, (int)src_len, max_decompresslen);
 }

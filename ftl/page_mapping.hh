@@ -49,6 +49,14 @@ class PageMapping : public AbstractFTL {
     offset(0),
     length(0)
     {}
+    //Change To Uncompressed.
+    void reset(){
+      is_compressed = 0;
+      c_ind = 0;
+      idx = 0;
+      offset = 0;
+      length = 0;
+    }
   };
   PAL::PAL *pPAL;
 

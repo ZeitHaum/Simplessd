@@ -143,22 +143,22 @@ uint16_t Disk::read(uint64_t slba, uint16_t nlblk, uint8_t *buffer) {
       if (!disk.good()) {
         // panic("nvme_disk: Fail to seek to %" PRIu64 "\n", slba);
       }
-      uint64_t compress_len = 0;
-      uint64_t decompress_len = 0;
-      char* compress_len_buf = new char[8];
-      disk.read((char*)compress_len_buf, 8);
-      compress_len = *((uint64_t*) compress_len_buf);
-      disk.seekp(slba + 8, std::ios::beg);
-      // disk.read((char *)buffer, avail);
-      disk.read((char *)(buffer), compress_len);
-      compressor->decompress(buffer, compress_len, decompress_len);
-      memcpy(buffer, compressor->buffer, decompress_len);
-      std::string info = "DeCompressed Occured: ";
-      info += std::to_string(slba);
-      info += " , Src Length" + std::to_string(compress_len);
-      info += " , Compressed Length" + std::to_string(decompress_len);
-      debugprint(LOG_COMMON, info.c_str());
-      
+      // uint64_t compress_len = 0;
+      // uint64_t decompress_len = 0;
+      // char* compress_len_buf = new char[8];
+      // disk.read((char*)compress_len_buf, 8);
+      // compress_len = *((uint64_t*) compress_len_buf);
+      // disk.seekp(slba + 8, std::ios::beg);
+      // // disk.read((char *)buffer, avail);
+      // disk.read((char *)(buffer), compress_len);
+      // compressor->decompress(buffer, compress_len, decompress_len);
+      // memcpy(buffer, compressor->buffer, decompress_len);
+      // std::string info = "DeCompressed Occured: ";
+      // info += std::to_string(slba);
+      // info += " , Src Length" + std::to_string(compress_len);
+      // info += " , DeCompressed Length" + std::to_string(decompress_len);
+      // debugprint(LOG_COMMON, info.c_str());
+      disk.read((char *)buffer, avail);
     }
 
     memset(buffer + avail, 0, nlblk * sectorSize - avail);
@@ -186,18 +186,20 @@ uint16_t Disk::write(uint64_t slba, uint16_t nlblk, uint8_t *buffer) {
     }
 
     uint64_t offset = disk.tellp();
-    uint64_t compress_len = 0;
-    char* compress_len_buf = new char[8];
-    *((uint64_t *)(compress_len_buf)) = compress_len;
-    compressor->compress(buffer, sectorSize * nlblk, compress_len);
-    disk.write((char *)compress_len_buf, 8);
-    disk.seekp(slba + 8, std::ios::beg);
-    disk.write((char *)(compressor->buffer), compress_len);
-    std::string info = "Compressed Occured: ";
-    info += std::to_string(slba);
-    info += " , Src Length" + std::to_string(sectorSize * nlblk);
-    info += " , Compressed Length" + std::to_string(compress_len);
-    debugprint(LOG_COMMON, info.c_str());
+    // uint64_t compress_len = 0;
+    // char* compress_len_buf = new char[8];
+    // *((uint64_t *)(compress_len_buf)) = compress_len;
+    // compressor->compress(buffer, sectorSize * nlblk, compress_len);
+    // disk.write((char *)compress_len_buf, 8);
+    // disk.seekp(slba + 8, std::ios::beg);
+    // disk.write((char *)(compressor->buffer), compress_len);
+    // std::string info = "Compressed Occured: ";
+    // info += std::to_string(slba);
+    // info += " , Src Length" + std::to_string(sectorSize * nlblk);
+    // info += " , Compressed Length" + std::to_string(compress_len);
+    // debugprint(LOG_COMMON, info.c_str());
+    // offset = (uint64_t)disk.tellp() - offset;
+    disk.write((char *)buffer, sectorSize * nlblk);
     offset = (uint64_t)disk.tellp() - offset;
 
     ret = offset / sectorSize;

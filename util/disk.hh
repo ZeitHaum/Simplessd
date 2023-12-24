@@ -36,7 +36,6 @@ class Disk {
   std::string filename;
   uint64_t diskSize;
   uint32_t sectorSize;
-  Compressor* compressor;
   std::fstream disk;
 
  public:
@@ -84,6 +83,20 @@ class MemDisk : public Disk {
   uint16_t erase(uint64_t, uint16_t) override;
 };
 
+  
+class CompressedDisk: public Disk{
+  private:
+    std::unordered_map<uint64_t, uint64_t> compressed_table;
+    Compressor compressor;
+  public:
+    CompressedDisk();
+    ~CompressedDisk();
+    virtual uint64_t open(std::string, uint64_t, uint32_t);
+    virtual void close();
+
+    virtual uint16_t read(uint64_t, uint16_t, uint8_t *);
+    virtual uint16_t write(uint64_t, uint16_t, uint8_t *);
+};
 }  // namespace SimpleSSD
 
 #endif

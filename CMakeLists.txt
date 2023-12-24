@@ -20,7 +20,8 @@ cmake_minimum_required(VERSION 3.10)
 project(simplessd)
 
 # Add options for debug build
-option(DEBUG_BUILD "Build SimpleSSD in debug mode." OFF)
+# option(DEBUG_BUILD "Build SimpleSSD in debug mode." OFF)
+option(DEBUG_BUILD "Build SimpleSSD in debug mode." ON)
 
 # Set output directory
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
@@ -47,13 +48,14 @@ if (NOT EXISTS "${PROJECT_SOURCE_DIR}/lib/mytest/testclass.h")
 Check you initialized submodules.")
 endif ()
 if (NOT EXISTS "${PROJECT_SOURCE_DIR}/lib/lz4/lib/lz4.h")
-  message(FATAL_ERROR "Failed to find mytest library. \
+  message(FATAL_ERROR "Failed to find lz4 library. \
 Check you initialized submodules.")
 endif ()
 
 # Add subproject
 add_subdirectory(${PROJECT_SOURCE_DIR}/lib/mcpat)
 add_subdirectory(${PROJECT_SOURCE_DIR}/lib/mytest)
+add_subdirectory(${PROJECT_SOURCE_DIR}/lib/lz4/build/cmake)
 
 # Set include directories
 include_directories(
@@ -209,13 +211,5 @@ add_library(simplessd STATIC
   ${SRC_UTIL}
 )
 
-add_custom_target(lz4_
-    COMMAND make -C ${CMAKE_SOURCE_DIR}/lib/lz4
-)
-add_library (
-  lz4 STATIC ${PROJECT_SOURCE_DIR}/lib/lz4/lib/lz4
-)
-
-add_dependencies(simplessd lz4)
-
+link_directories(${PROJECT_SOURCE_DIR}/lib/lz4/lib/)
 target_link_libraries(simplessd mcpat mytest lz4)

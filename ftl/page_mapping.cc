@@ -203,13 +203,13 @@ void PageMapping::read(Request &req, uint64_t &tick) {
       GarbageCollection 0 Block.
       And Read.
       */
-      Request test_req = Request(param.ioUnitInPage);
-      test_req.lpn = 0;
-      test_req.ioFlag.set();
-      readInternal(test_req, tick);
-      vector<uint32_t> bl(1, 0);
-      doGarbageCollection(bl, tick);
-      readInternal(test_req, tick);
+      // Request test_req = Request(param.ioUnitInPage);
+      // test_req.lpn = 0;
+      // test_req.ioFlag.set();
+      // readInternal(test_req, tick);
+      // vector<uint32_t> bl(1, 0);
+      // doGarbageCollection(bl, tick);
+      // readInternal(test_req, tick);
       /*
       Test 1 End
       */
@@ -558,11 +558,18 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
     return;
   }
 
-  WriteInfo w_info;
+  WriteInfo w_info = WriteInfo(8);
   
   auto write_submit = [&](WriteInfo& w_info, std::unordered_map<uint32_t, Block>::iterator freeBlock){
     // Block
     assert(w_info.valid);
+    // invalidate
+    assert(w_info.invalidate_blocks.size() == w_info.invalidate_idxs.size());
+    assert(w_info.invalidate_blocks.size() == w_info.invalidate_pages.size());
+    for(uint32_t i = 0; i<w_info.invalidate_blocks.size(); ++i){
+      auto indv_block = blocks.find(w_info.invalidate_blocks[i]);
+      indv_block->second.invalidate(w_info.invalidate_pages[i], w_info.invalidate_idxs[i]);
+    }
     freeBlock->second.write(w_info);
     req.blockIndex = freeBlock->first;
     req.pageIndex = w_info.pageIndex;
@@ -578,7 +585,10 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
     writeRequests.push_back(req);
     //Clear W_info
     w_info.valid = false;
-    w_info.lpns.clear();
+    w_info.validcount = 0;
+    w_info.invalidate_idxs.clear();
+    w_info.invalidate_pages.clear();
+    w_info.invalidate_blocks.clear();
   };
 
   // For all blocks to reclaim, collecting request structure only
@@ -618,9 +628,6 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
 
         for (uint32_t idx = 0; idx < bitsetSize; idx++) {
           if (bit.test(idx)) {
-            // Invalidate
-            block->second.invalidate(pageIndex, idx);
-
             auto mappingList = table.find(lpns.at(idx));
 
             if (mappingList == table.end()) {
@@ -642,8 +649,10 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
               w_info.idx = idx;
               w_info.beginAt = beginAt;
               w_info.pageIndex = nowPageIdx;
-              block->second.getLPNs(pageIndex, w_info.lpns, idx);
+              block->second.getLPNs(pageIndex, w_info.lpns, w_info.validmask,idx);
               w_info.valid = true;
+              // simply invalidate 1 page
+              block->second.invalidate(pageIndex, idx);
               write_submit(w_info, freeBlock);
               //DONOTHING ON Compressed Info.
             }
@@ -657,6 +666,7 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                 w_info.valid = true;
                 w_info.pageIndex = nowPageIdx;
                 w_info.idx = idx;
+                w_info.validmask.reset();
                 w_info.beginAt = beginAt;
               }
               std::get<0>(mapping) = newBlockIdx;
@@ -665,16 +675,20 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
               c_info->is_compressed = 0x1;
               c_info->c_ind = nowPageCnt++;
               c_info->offset = nowOffset;
-              assert(CompressedLength <= (1 << 28));
+              assert(CompressedLength <= (1 << 26));
               c_info->length = CompressedLength;
               c_info->idx = w_info.idx;
               nowOffset += CompressedLength;
               //TODO: CHANGE LOGIC OF ISFILLED
               is_filled = nowOffset >= param.pageSize;
-              vector<uint64_t> t_lpn;
-              block->second.getLPNs(pageIndex, t_lpn, idx);
-              assert(t_lpn.size() == 1);
-              w_info.lpns.push_back(t_lpn[0]);
+              vector<uint64_t> t_lpn(8, 0);
+              Bitset t_bst(8);
+              block->second.getLPNs(pageIndex, t_lpn, t_bst,idx);
+              assert((t_lpn.size() == 8 && t_bst.test(0)));
+              w_info.lpns.at(w_info.validcount++) = t_lpn[0];
+              w_info.invalidate_blocks.push_back((uint64_t)(iter));
+              w_info.invalidate_idxs.push_back(idx);
+              w_info.invalidate_pages.push_back(pageIndex);
             }
 
             stat.validPageCopies++;//Invalid
@@ -785,6 +799,9 @@ void PageMapping::readInternal(Request &req, uint64_t &tick) {
   }
 }
 
+//Used for GC only
+
+
 void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
   PAL::Request palRequest(req);
   std::unordered_map<uint32_t, Block>::iterator block;
@@ -845,6 +862,10 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
     readBeforeWrite = true;
   }
 
+  //First Write Don't Compress.
+  Bitset validmask = Bitset(8);
+  vector<uint64_t> lpns(8, 0);
+  validmask.set(0);
   for (uint32_t idx = 0; idx < bitsetSize; idx++) {
     if (req.ioFlag.test(idx) || !bRandomTweak) {
       uint32_t pageIndex = block->second.getNextWritePageIndex(idx);
@@ -852,9 +873,9 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
 
       beginAt = tick;
       
-      //first write, write 0;
-      vector<uint64_t> lpns(1, req.lpn);
-      block->second.write(pageIndex, lpns, idx, beginAt);
+      //first write, write 0.
+      lpns[0] = req.lpn;
+      block->second.write(pageIndex, lpns, validmask, idx, beginAt);
 
       // Read old data if needed (Only executed when bRandomTweak = false)
       // Maybe some other init procedures want to perform 'partial-write'
@@ -873,6 +894,7 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
       // update mapping to table
       std::get<0>(mapping) = block->first;
       std::get<1>(mapping) = pageIndex;
+      std::get<2>(mapping).reset();
 
       if (sendToPAL) {
         palRequest.blockIndex = block->first;
