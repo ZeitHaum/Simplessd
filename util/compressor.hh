@@ -17,7 +17,7 @@ public:
 
 class LZ4Compressor: public Compressor{
     public:
-        inline int getMaxDecompressLen(uint64_t decomp_len);
+        inline int getMaxDecompressLen();
         inline int getMaxCompressLen(uint64_t comp_len);
         void compress(uint8_t* src, uint64_t src_len, uint64_t& dest_len);
         void decompress(uint8_t* src, uint64_t src_len, uint64_t& dest_len);

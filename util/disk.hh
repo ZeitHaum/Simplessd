@@ -87,15 +87,26 @@ class MemDisk : public Disk {
 class CompressedDisk: public Disk{
   private:
     std::unordered_map<uint64_t, uint64_t> compressed_table;
-    Compressor compressor;
+    Compressor* compressor;
+    uint32_t compress_unit_size;
+    uint32_t compress_unit_totalcnt;
   public:
     CompressedDisk();
-    ~CompressedDisk();
+    void init(uint32_t);
+    uint64_t getCompressedLength(uint64_t offset, uint64_t length);
+    void setCompressedLength(uint64_t offset, uint64_t com_len);
+    //只要有任意一段在table中就视为压缩过
+    bool isInCompressedTable(uint64_t offset, uint64_t length);
+    virtual ~CompressedDisk();
     virtual uint64_t open(std::string, uint64_t, uint32_t);
-    virtual void close();
 
     virtual uint16_t read(uint64_t, uint16_t, uint8_t *);
     virtual uint16_t write(uint64_t, uint16_t, uint8_t *);
+    virtual uint16_t erase(uint64_t, uint16_t);
+    void eraseInternal(uint64_t, uint64_t);
+    void readInternal(uint64_t, uint64_t, uint8_t *);
+    void writeInternal(uint64_t, uint8_t*, uint64_t&);
+    void writeInternal(uint64_t, uint64_t, uint8_t*, uint64_t&); // 带自动补齐table
 };
 }  // namespace SimpleSSD
 

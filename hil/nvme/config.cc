@@ -45,6 +45,7 @@ const char NAME_ENABLE_DISK_IMAGE[] = "EnableDiskImage";
 const char NAME_STRICT_DISK_SIZE[] = "StrictSizeCheck";
 const char NAME_DISK_IMAGE_PATH[] = "DiskImageFile";
 const char NAME_USE_COW_DISK[] = "UseCopyOnWriteDisk";
+const char NAME_ENABLE_Compress[] = "EnableCompress";
 
 Config::Config() {
   pcieGen = PCIExpress::PCIE_3_X;
@@ -167,6 +168,10 @@ bool Config::setConfig(const char *name, const char *value) {
   else if (MATCH_NAME(NAME_USE_COW_DISK)) {
     useCopyOnWriteDisk = convertBool(value);
   }
+
+  else if (MATCH_NAME(NAME_ENABLE_Compress)){
+    enableCompress = convertBool(value);
+  }
   else {
     ret = false;
   }
@@ -271,6 +276,9 @@ bool Config::readBoolean(uint32_t idx) {
       break;
     case NVME_USE_COW_DISK:
       ret = useCopyOnWriteDisk;
+      break;
+    case NVME_USE_COMPRESSED_DISK:
+      ret = enableCompress;
       break;
   }
 

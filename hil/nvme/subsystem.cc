@@ -106,6 +106,8 @@ void Subsystem::init() {
 void Subsystem::convertUnit(Namespace *ns, uint64_t slba, uint64_t nlblk,
                             Request &req) {
   Namespace::Information *info = ns->getInfo();
+  req.cd_info.pDisk = ns->getDisk();
+  req.cd_info.offset = info->range.slpn * logicalPageSize;
   uint32_t lbaratio = logicalPageSize / info->lbaSize;
   uint64_t slpn;
   uint64_t nlp;
@@ -220,7 +222,13 @@ bool Subsystem::createNamespace(uint32_t nsid, Namespace::Information *info) {
 
   // Create namespace
   Namespace *pNS = new Namespace(this, cfgdata);
+  if(cfgdata.pConfigReader->readBoolean(CONFIG_NVME, NVME_USE_COMPRESSED_DISK)){
+    if(max(logicalPageSize, info->lbaSize) % min(logicalPageSize, info->lbaSize) !=0){
+      panic("Error: Unmatched pageSize between subSystem and NameSpace");
+    }
+  }
   pNS->setData(nsid, info);
+  ((CompressedDisk*)(pNS->getDisk()))->init(min(logicalPageSize, info->lbaSize));
 
   lNamespaces.push_back(pNS);
   debugprint(LOG_HIL_NVME,

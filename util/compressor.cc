@@ -1,7 +1,7 @@
 //Compressor, author: ZeitHaum.
 #include "util/compressor.hh"
 extern "C"{
-    #include "lib/lz4/lib/lz4.h"
+    #include "lib/lz4/lib/lz4.c"
 }
 #include "string.h"
 
@@ -25,8 +25,8 @@ inline void Compressor::ajustBuffer(uint64_t buffer_len){
     }
 }
 
-inline int LZ4Compressor::getMaxDecompressLen(uint64_t decomp_len){
-    return (int) (decomp_len * 8); // a PPN max store 8 Compressed Page
+inline int LZ4Compressor::getMaxDecompressLen(){
+    return (int) buffer_size; // maxComtain a buffer Size
 }
 
 inline int LZ4Compressor::getMaxCompressLen(uint64_t comp_len){
@@ -40,7 +40,8 @@ void LZ4Compressor::compress(uint8_t* src, uint64_t src_len, uint64_t& dest_len)
 }
 
 void LZ4Compressor::decompress(uint8_t* src, uint64_t src_len, uint64_t& dest_len){
-    int max_decompresslen = getMaxDecompressLen(src_len);
+    int max_decompresslen = getMaxDecompressLen();
     this->ajustBuffer(max_decompresslen);
     dest_len = LZ4_decompress_safe((char*)src, (char*) this->buffer, (int)src_len, max_decompresslen);
+    assert(dest_len <= max_decompresslen);
 }

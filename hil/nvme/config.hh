@@ -50,7 +50,8 @@ typedef enum {
   NVME_ENABLE_DISK_IMAGE,
   NVME_STRICT_DISK_SIZE,
   NVME_DISK_IMAGE_PATH,
-  NVME_USE_COW_DISK
+  NVME_USE_COW_DISK,
+  NVME_USE_COMPRESSED_DISK
 } NVME_CONFIG;
 
 class Config : public BaseConfig {
@@ -71,6 +72,7 @@ class Config : public BaseConfig {
   bool enableDiskImage;          //!< Default: False
   bool strictDiskSize;           //!< Default: False
   bool useCopyOnWriteDisk;       //!< Default: False
+  bool enableCompress;           //!< Default: False
   std::unordered_map<uint16_t, std::string> diskImagePaths;  //!< Default: ""
 
  public:

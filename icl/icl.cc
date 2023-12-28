@@ -69,6 +69,7 @@ void ICL::read(Request &req, uint64_t &tick) {
   uint64_t reqRemain = req.length;
   Request reqInternal;
 
+  reqInternal.cd_info = req.cd_info;
   reqInternal.reqID = req.reqID;
   reqInternal.offset = req.offset;
 

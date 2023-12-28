@@ -132,6 +132,8 @@ class Namespace {
   Information *getInfo();
   bool isAttached();
 
+  Disk* getDisk();
+
   void format(uint64_t);
 };
 

@@ -30,13 +30,13 @@
 
 // #define DEBUG
 #include "sim/trace.hh"
+#include <string>
 
 namespace SimpleSSD {
 
-Disk::Disk() : diskSize(0), sectorSize(0), compressor(new LZ4Compressor()){}
+Disk::Disk() : diskSize(0), sectorSize(0){}
 
 Disk::~Disk() {
-  delete compressor;
   close();
 }
 
@@ -349,6 +349,208 @@ uint16_t MemDisk::erase(uint64_t slba, uint16_t nlblk) {
   }
 
   return erase;
+}
+
+CompressedDisk::CompressedDisk(){
+  compressor = new LZ4Compressor();
+}
+
+CompressedDisk::~CompressedDisk(){
+  delete compressor;
+}
+
+uint64_t CompressedDisk::open(std::string path, uint64_t desiredSize, uint32_t lbaSize){
+  uint64_t disk_size = Disk::open(path, desiredSize, lbaSize);
+  return disk_size;
+}
+
+void CompressedDisk::init(uint32_t cdsize){
+  compress_unit_size = cdsize;
+  this->compress_unit_totalcnt = diskSize / compress_unit_size  + 1;
+  compressed_table.reserve(this->compress_unit_totalcnt);
+  const std::string info_head = "CompressedDiskInit:";
+  std::string info = info_head + " compress_unit_size: " + std::to_string(this->compress_unit_size) + ", compress_unit_totalcnt: " + std::to_string(this->compress_unit_totalcnt);
+  debugprint(LOG_COMMON, info.c_str());
+}
+
+uint16_t CompressedDisk::read(uint64_t slba, uint16_t nlblk, uint8_t *buffer){
+  //default Need DeCompress
+  debugprint(LOG_COMMON, "CompressedDiskRead: slba | nlblk ");
+  const std::string info_head = "CompressedDiskRead:";
+  std::string info = info_head;
+  info += std::to_string(slba) + " | " + std::to_string(nlblk);
+  debugprint(LOG_COMMON, info.c_str());
+  info = info_head;
+  uint16_t ret = Disk::read(slba, nlblk, buffer);
+  info += "Actual Read Blocks:" + std::to_string(ret);
+  debugprint(LOG_COMMON, info.c_str());
+  // Decompress
+  uint64_t offset = 0;
+  for(uint16_t i = 0; i<ret; ++i){
+    readInternal((slba + i) * sectorSize, sectorSize, buffer + offset);
+    offset += this->sectorSize;
+  }
+  return ret;
+}
+
+uint16_t CompressedDisk::write(uint64_t slba, uint16_t nlblk, uint8_t *buffer){
+  //default Need Compress
+  debugprint(LOG_COMMON, "CompressedDiskWrite: slba | nlblk ");
+  const std::string info_head = "CompressedDiskWrite:";
+  std::string info = info_head;
+  info+= std::to_string(slba) + " | " + std::to_string(nlblk);
+  debugprint(LOG_COMMON, info.c_str());
+  //compress
+  std::vector<uint64_t> compressed_lens(nlblk, 0);
+  uint64_t offset = 0;
+  for(uint16_t i = 0; i<nlblk; ++i){
+    // compressor->compress(buffer+offset, this->sectorSize, compressed_lens[i]);
+    // memcpy(buffer+offset, compressor->buffer, compressed_lens[i]);
+    writeInternal(sectorSize, buffer+offset, compressed_lens[i]);
+    offset += this->sectorSize;
+  }
+  //actual write
+  info = info_head;
+  uint16_t ret = Disk::write(slba, nlblk, buffer); 
+  info += "Actual Write Blocks: " + std::to_string(ret);
+  debugprint(LOG_COMMON, info.c_str());
+  for(uint16_t i = 0; i<ret; ++i){
+    for(uint64_t j = 0; j<sectorSize / compress_unit_size; ++j){
+      uint64_t offset = (slba + i) * sectorSize + j * compress_unit_size;
+      setCompressedLength(offset, compressed_lens[i]);
+      //debug print;
+      info = info_head;
+      info += "Compress idx: " + std::to_string(offset / compress_unit_size) + ", src_len: " + std::to_string(this->compress_unit_size) + ", dest_len: " + std::to_string(compressed_lens[i]);
+      debugprint(LOG_COMMON, info.c_str()); 
+    }
+  }
+  return ret;
+}
+
+uint16_t CompressedDisk::erase(uint64_t slba, uint16_t nlblk) {
+  for(uint16_t i = 0; i<nlblk; ++i){
+    eraseInternal((slba + i) * sectorSize, sectorSize);
+  }
+  return nlblk;
+}
+
+void CompressedDisk::eraseInternal(uint64_t offset, uint64_t length){
+  if(offset % compress_unit_size !=0 || length % compress_unit_size !=0){
+    panic("Error: unmatched access I/O Size");
+  }
+  uint64_t idx = offset / compress_unit_size;
+  uint64_t cnt = length / compress_unit_size;
+  for(uint64_t i = 0; i<cnt ; ++i){
+    if(compressed_table.find(idx + i) != compressed_table.end()){
+      compressed_table.erase(idx + i);
+    }
+  }
+}
+void CompressedDisk::readInternal(uint64_t offset, uint64_t length, uint8_t * buffer){
+  if(offset % compress_unit_size !=0 || length % compress_unit_size !=0){
+    panic("Error: unmatched access I/O Size");
+  }
+  const std::string info_head = "CompressedDiskRead:";
+  uint64_t idx = offset / compress_unit_size;
+  uint64_t cnt = length / compress_unit_size;
+  uint64_t buf_offset = 0;
+  for(uint64_t i = 0; i<cnt; ++i){
+    if(compressed_table.find(idx + i)==compressed_table.end() || compressed_table.at(idx + i) == compress_unit_size){
+      continue; 
+    }
+    uint64_t src_len = getCompressedLength(buf_offset + offset, compress_unit_size), dest_len = 0;
+    compressor->decompress(buffer + buf_offset, src_len, dest_len);
+    if(dest_len > this->compress_unit_size){
+      panic("DecompressedSize OverFlow, greater than a compress unit size.");
+    }
+    memcpy(buffer + buf_offset, compressor->buffer,  dest_len);
+    buf_offset += this->compress_unit_size;
+    std::string info = info_head;
+    info += "Decompress idx: " + std::to_string(idx + i) + ", src_len: " + std::to_string(src_len) + ", dest_len: " + std::to_string(dest_len);
+    debugprint(LOG_COMMON, info.c_str());  
+  }
+}
+void CompressedDisk::writeInternal(uint64_t length, uint8_t* buffer, uint64_t& comp_len){
+  if(length % compress_unit_size !=0){
+    panic("Error: unmatched access I/O Size");
+  }
+  const std::string info_head = "CompressedDiskWrite:";
+  uint64_t buff_offset = 0;
+  uint64_t cnt = length / compress_unit_size;
+  for(uint64_t i = 0; i<cnt; ++i){
+    compressor->compress(buffer+buff_offset, this->compress_unit_size, comp_len);
+    if(comp_len > compress_unit_size){
+      panic("CompressedSize OverFlow, greater than a compress unit size.");
+    }
+    memcpy(buffer+buff_offset, compressor->buffer, comp_len);
+    buff_offset += compress_unit_size;
+  }
+}
+
+void CompressedDisk::writeInternal(uint64_t offset, uint64_t length, uint8_t* buffer, uint64_t& comp_len){
+  if(offset % compress_unit_size !=0 || length % compress_unit_size !=0){
+    panic("Error: unmatched access I/O Size");
+  }
+  comp_len = 0;
+  uint64_t cnt = length / compress_unit_size;
+  uint64_t sub_comp_len = 0;
+  uint64_t idx = offset / compress_unit_size;
+  for(uint64_t i = 0; i<cnt; ++i){
+    sub_comp_len = 0;
+    writeInternal(offset, buffer + (compress_unit_size * i), sub_comp_len);
+    if(sub_comp_len > compress_unit_size){
+      panic("CompressedSize OverFlow, greater than a compress unit size.");
+    }
+    comp_len += sub_comp_len;
+    compressed_table[idx + i] = sub_comp_len;
+    std::string info = "CompressedDiskWriteInternal: ";
+    info += "Compress idx: " + std::to_string(idx + i) + ", src_len: " + std::to_string(this->compress_unit_size) + ", dest_len: " + std::to_string(sub_comp_len);
+    debugprint(LOG_COMMON, info.c_str()); 
+  }
+}
+
+uint64_t CompressedDisk::getCompressedLength(uint64_t offset, uint64_t length){
+  uint64_t ret = 0;
+  if(!isInCompressedTable(offset, length)){
+    std::string warn_s = "Uncompressed In Disk, offset = " + std::to_string(offset) + ", length = " + std::to_string(length);
+    warn(warn_s.c_str());
+    ret = length;
+  }
+  else{
+    uint64_t idx = offset / compress_unit_size;
+    uint64_t cnt = length / compress_unit_size;
+    for(uint64_t i = 0; i<cnt; ++i){
+      if(compressed_table.find(idx + i) != compressed_table.end()){
+        ret += compressed_table.at(idx + i);
+      }
+      else{
+        ret += compress_unit_size;
+      }
+    }
+  }
+  return ret;
+}
+
+void CompressedDisk::setCompressedLength(uint64_t offset, uint64_t com_len){
+  if(offset % compress_unit_size !=0 ){
+    panic("Error: unmatched access I/O Size");
+  }
+  uint64_t idx = offset / compress_unit_size;
+  compressed_table[idx] = com_len;
+}
+
+bool CompressedDisk::isInCompressedTable(uint64_t offset, uint64_t length){
+  if(offset % compress_unit_size !=0 || length % compress_unit_size !=0){
+    panic("Error: unmatched access I/O Size");
+  }
+  uint64_t idx = offset / compress_unit_size;
+  uint64_t cnt = length / compress_unit_size;
+  for(uint64_t i = 0; i<cnt; ++i){
+    if(compressed_table.find(idx + i) != compressed_table.end()){
+      return true;
+    }
+  }
+  return false;
 }
 
 }  // namespace SimpleSSD

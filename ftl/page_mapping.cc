@@ -40,9 +40,12 @@ PageMapping::PageMapping(ConfigReader &c, Parameter &p, PAL::PAL *l,
       conf(c),
       lastFreeBlock(param.pageCountToMaxPerf),
       lastFreeBlockIOMap(param.ioUnitInPage),
-      bReclaimMore(false) {
+      bReclaimMore(false),
+      cd_info(nullptr)
+       {
   blocks.reserve(param.totalPhysicalBlocks);
   table.reserve(param.totalLogicalBlocks * param.pagesInBlock);
+  compressedBuffer = new uint8_t[param.pageSize];
 
   for (uint32_t i = 0; i < param.totalPhysicalBlocks; i++) {
     freeBlocks.emplace_back(Block(i, param.pagesInBlock, param.ioUnitInPage));
@@ -65,7 +68,9 @@ PageMapping::PageMapping(ConfigReader &c, Parameter &p, PAL::PAL *l,
   bitsetSize = bRandomTweak ? param.ioUnitInPage : 1;
 }
 
-PageMapping::~PageMapping() {}
+PageMapping::~PageMapping() {
+  delete[] compressedBuffer;
+}
 
 bool PageMapping::initialize() {
   uint64_t nPagesToWarmup;
@@ -191,6 +196,7 @@ bool PageMapping::initialize() {
 
 void PageMapping::read(Request &req, uint64_t &tick) {
   uint64_t begin = tick;
+  this->cd_info = &req.cd_info;
 
   if (req.ioFlag.count() > 0) {
     #ifdef DEBUG_TEST
@@ -203,13 +209,15 @@ void PageMapping::read(Request &req, uint64_t &tick) {
       GarbageCollection 0 Block.
       And Read.
       */
-      // Request test_req = Request(param.ioUnitInPage);
-      // test_req.lpn = 0;
-      // test_req.ioFlag.set();
-      // readInternal(test_req, tick);
-      // vector<uint32_t> bl(1, 0);
-      // doGarbageCollection(bl, tick);
-      // readInternal(test_req, tick);
+      if(cd_info->pDisk && req.lpn == 0 && req.ioFlag.test(4) && ((CompressedDisk*)(cd_info->pDisk))->isInCompressedTable(4096, 4096)){
+        Request test_req = Request(param.ioUnitInPage);
+        test_req.lpn = 0;
+        test_req.ioFlag.set();
+        readInternal(test_req, tick);
+        vector<uint32_t> bl(1, 0);
+        doGarbageCollection(bl, tick);
+        readInternal(test_req, tick);
+      } 
       /*
       Test 1 End
       */
@@ -254,6 +262,7 @@ void PageMapping::read(Request &req, uint64_t &tick) {
 
 void PageMapping::write(Request &req, uint64_t &tick) {
   uint64_t begin = tick;
+  this->cd_info = &req.cd_info;
 
   if (req.ioFlag.count() > 0) {
     writeInternal(req, tick);
@@ -272,6 +281,7 @@ void PageMapping::write(Request &req, uint64_t &tick) {
 
 void PageMapping::trim(Request &req, uint64_t &tick) {
   uint64_t begin = tick;
+  this->cd_info = &req.cd_info;
 
   trimInternal(req, tick);
 
@@ -671,7 +681,21 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
               }
               std::get<0>(mapping) = newBlockIdx;
               std::get<1>(mapping) = nowPageIdx;
-              int CompressedLength = param.pageSize / 2; // TODO: Change it to true Size
+              //Get Compressed Length
+              uint64_t idxSize = param.pageSize / param.ioUnitInPage;
+              uint64_t CompressedLength = idxSize ;
+              uint64_t disk_offset = (pageIndex * param.ioUnitInPage + idx) * idxSize - cd_info->offset;
+              uint64_t disk_length = idxSize;
+              CompressedDisk* pcDisk = ((CompressedDisk*)(cd_info->pDisk));
+              if(cd_info->pDisk){
+                CompressedLength = pcDisk->getCompressedLength(disk_offset, disk_length);
+              }
+              if(CompressedLength == idxSize){
+                //Need Compress
+                pcDisk -> readInternal(disk_offset, disk_length, compressedBuffer);
+                pcDisk -> writeInternal(disk_offset, disk_length, compressedBuffer, CompressedLength);
+                debugprint(LOG_FTL_PAGE_MAPPING, "Compressed Trigged In GC! pageIndex =%" PRIu64 ", idx = %" PRIu64, pageIndex, idx);
+              }
               c_info->is_compressed = 0x1;
               c_info->c_ind = nowPageCnt++;
               c_info->offset = nowOffset;
@@ -679,8 +703,7 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
               c_info->length = CompressedLength;
               c_info->idx = w_info.idx;
               nowOffset += CompressedLength;
-              //TODO: CHANGE LOGIC OF ISFILLED
-              is_filled = nowOffset >= param.pageSize;
+              is_filled = nowOffset >= idxSize || w_info.invalidate_idxs.size() == 7;
               vector<uint64_t> t_lpn(8, 0);
               Bitset t_bst(8);
               block->second.getLPNs(pageIndex, t_lpn, t_bst,idx);

@@ -115,7 +115,10 @@ void Namespace::setData(uint32_t id, Information *data) {
     std::string filename =
         conf.readString(CONFIG_NVME, NVME_DISK_IMAGE_PATH + nsid);
 
-    if (filename.length() == 0) {
+    if (conf.readBoolean(CONFIG_NVME, NVME_USE_COMPRESSED_DISK)){
+      pDisk = new CompressedDisk();
+    }
+    else if (filename.length() == 0) {
       pDisk = new MemDisk();
     }
     else if (conf.readBoolean(CONFIG_NVME, NVME_USE_COW_DISK)) {
@@ -682,6 +685,10 @@ void Namespace::datasetManagement(SQEntryWrapper &req, RequestFunction &func) {
   else {
     func(resp);
   }
+}
+
+Disk* Namespace::getDisk(){
+  return pDisk;
 }
 
 }  // namespace NVMe

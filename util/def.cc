@@ -62,7 +62,8 @@ Request::_Request(HIL::Request &r)
       reqSubID(r.reqSubID),
       offset(r.offset),
       length(r.length),
-      range(r.range) {}
+      range(r.range), 
+      cd_info(r.cd_info){}
 
 }  // namespace ICL
 
@@ -75,7 +76,8 @@ Request::_Request(uint32_t iocount, ICL::Request &r)
     : reqID(r.reqID),
       reqSubID(r.reqSubID),
       lpn(r.range.slpn / iocount),
-      ioFlag(iocount) {
+      ioFlag(iocount),
+      cd_info(r.cd_info) {
   ioFlag.set(r.range.slpn % iocount);
 }
 
@@ -94,5 +96,13 @@ Request::_Request(FTL::Request &r)
       ioFlag(r.ioFlag) {}
 
 }  // namespace PAL
+
+CompressedDiskInfo::CompressedDiskInfo()
+:pDisk(nullptr), offset(0)
+{}
+
+CompressedDiskInfo::CompressedDiskInfo(Disk* disk, uint64_t offset_)
+:pDisk(disk), offset(offset_)
+{}
 
 }  // namespace SimpleSSD

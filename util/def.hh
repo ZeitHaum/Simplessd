@@ -26,6 +26,7 @@
 
 #include "sim/dma_interface.hh"
 #include "util/bitset.hh"
+#include "util/disk.hh"
 
 namespace SimpleSSD {
 
@@ -36,6 +37,13 @@ typedef struct _LPNRange {
   _LPNRange();
   _LPNRange(uint64_t, uint64_t);
 } LPNRange;
+
+struct CompressedDiskInfo{
+  Disk *pDisk;
+  uint64_t offset;
+  CompressedDiskInfo();
+  CompressedDiskInfo(Disk*, uint64_t);
+};
 
 namespace HIL {
 
@@ -49,6 +57,7 @@ typedef struct _Request {
   uint64_t finishedAt;
   DMAFunction function;
   void *context;
+  CompressedDiskInfo cd_info;
 
   _Request();
   _Request(DMAFunction &, void *);
@@ -66,6 +75,7 @@ typedef struct _Request {
   uint64_t offset;
   uint64_t length;
   LPNRange range;
+  CompressedDiskInfo cd_info;
 
   _Request();
   _Request(HIL::Request &);
@@ -80,6 +90,7 @@ typedef struct _Request {
   uint64_t reqSubID;
   uint64_t lpn;
   Bitset ioFlag;
+  CompressedDiskInfo cd_info;
 
   _Request(uint32_t);
   _Request(uint32_t, ICL::Request &);

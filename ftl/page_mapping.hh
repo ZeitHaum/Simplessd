@@ -28,6 +28,7 @@
 #include "ftl/common/block.hh"
 #include "ftl/ftl.hh"
 #include "pal/pal.hh"
+#include "util/disk.hh"
 
 
 namespace SimpleSSD {
@@ -38,7 +39,7 @@ class PageMapping : public AbstractFTL {
  private:
   struct CompressInfo{
     uint64_t is_compressed : 1;
-    uint64_t c_ind : 3;// max 8 block in a physical page
+    uint64_t c_ind : 3;// max 8 page in a physical page
     uint64_t idx : 8;
     uint64_t offset : 26;
     uint64_t length : 26;
@@ -82,6 +83,8 @@ class PageMapping : public AbstractFTL {
     uint64_t erasedTotalBlocks;
     uint64_t testThirdParty;
   } stat;
+  CompressedDiskInfo* cd_info;
+  uint8_t* compressedBuffer;
 
   float freeBlockRatio();
   uint32_t convertBlockIdx(uint32_t);
