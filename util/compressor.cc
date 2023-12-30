@@ -12,6 +12,12 @@ Compressor::Compressor()
     buffer = new uint8_t[buffer_size];
 }
 
+Compressor::Compressor(uint64_t buffer_sz)
+:buffer_size(buffer_sz)
+{
+    buffer = new uint8_t[buffer_size];
+}
+
 Compressor::~Compressor(){
     delete[] buffer;
 }
@@ -24,6 +30,14 @@ inline void Compressor::ajustBuffer(uint64_t buffer_len){
         buffer = new uint8_t[buffer_size];
     }
 }
+
+LZ4Compressor::LZ4Compressor()
+:Compressor()
+{}
+
+LZ4Compressor::LZ4Compressor(uint64_t buffer_size)
+:Compressor(buffer_size)
+{}
 
 inline int LZ4Compressor::getMaxDecompressLen(){
     return (int) buffer_size; // maxComtain a buffer Size

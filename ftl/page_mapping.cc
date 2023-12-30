@@ -45,7 +45,7 @@ PageMapping::PageMapping(ConfigReader &c, Parameter &p, PAL::PAL *l,
        {
   blocks.reserve(param.totalPhysicalBlocks);
   table.reserve(param.totalLogicalBlocks * param.pagesInBlock);
-  compressedBuffer = new uint8_t[param.pageSize];
+  compressedBuffer = new uint8_t[param.pageSize / param.ioUnitInPage];
 
   for (uint32_t i = 0; i < param.totalPhysicalBlocks; i++) {
     freeBlocks.emplace_back(Block(i, param.pagesInBlock, param.ioUnitInPage));
@@ -209,7 +209,7 @@ void PageMapping::read(Request &req, uint64_t &tick) {
       GarbageCollection 0 Block.
       And Read.
       */
-      if(cd_info->pDisk && req.lpn == 0 && req.ioFlag.test(4) && ((CompressedDisk*)(cd_info->pDisk))->isInCompressedTable(4096, 4096)){
+      if(cd_info->pDisk && req.lpn == 0 && req.ioFlag.test(4) && ((CompressedDisk*)(cd_info->pDisk))->isCompressed(1)){
         Request test_req = Request(param.ioUnitInPage);
         test_req.lpn = 0;
         test_req.ioFlag.set();
@@ -688,14 +688,16 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
               uint64_t disk_length = idxSize;
               CompressedDisk* pcDisk = ((CompressedDisk*)(cd_info->pDisk));
               if(cd_info->pDisk){
-                CompressedLength = pcDisk->getCompressedLength(disk_offset, disk_length);
+                CompressedLength = pcDisk->getCompressedLength(disk_offset/idxSize);
               }
               if(CompressedLength == idxSize){
                 //Need Compress
-                pcDisk -> readInternal(disk_offset, disk_length, compressedBuffer);
-                pcDisk -> writeInternal(disk_offset, disk_length, compressedBuffer, CompressedLength);
+                pcDisk -> readOriginal(disk_offset, disk_length, compressedBuffer);
+                pcDisk -> compressWrite(disk_offset / idxSize, compressedBuffer);
                 debugprint(LOG_FTL_PAGE_MAPPING, "Compressed Trigged In GC! pageIndex =%" PRIu64 ", idx = %" PRIu64, pageIndex, idx);
+                CompressedLength = pcDisk->getCompressedLength(disk_offset/idxSize);
               }
+              assert(CompressedLength < idxSize && "FTLGC Error: compressed Trigged Failed.");
               c_info->is_compressed = 0x1;
               c_info->c_ind = nowPageCnt++;
               c_info->offset = nowOffset;

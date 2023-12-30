@@ -228,7 +228,7 @@ bool Subsystem::createNamespace(uint32_t nsid, Namespace::Information *info) {
     }
   }
   pNS->setData(nsid, info);
-  ((CompressedDisk*)(pNS->getDisk()))->init(min(logicalPageSize, info->lbaSize));
+  ((CompressedDisk*)(pNS->getDisk()))->init(logicalPageSize);
 
   lNamespaces.push_back(pNS);
   debugprint(LOG_HIL_NVME,
