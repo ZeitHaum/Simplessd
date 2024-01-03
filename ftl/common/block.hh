@@ -29,10 +29,15 @@ namespace SimpleSSD {
 
 namespace FTL {
 
+struct LpnInfo{
+  uint64_t lpn;
+  uint32_t idx;
+}; 
+
 struct WriteInfo{
   bool valid;
   uint32_t pageIndex;
-  std::vector<uint64_t> lpns;
+  std::vector<LpnInfo> lpns;
   std::vector<uint64_t> invalidate_idxs;
   std::vector<uint64_t> invalidate_blocks;
   std::vector<uint64_t> invalidate_pages;
@@ -46,10 +51,11 @@ struct WriteInfo{
     validcount(0),
     maxCompressedPageCount(mcpn)
   {
-    lpns = std::vector<uint64_t>(8, 0);
+    lpns = std::vector<LpnInfo>(maxCompressedPageCount, {0, 0});
     validmask = Bitset(maxCompressedPageCount);
   }
 };
+
 
 class Block {
  private:
@@ -60,18 +66,18 @@ class Block {
 
   //Unused
   Bitset *pValidBits;
-  uint64_t *pLPNs;
+  LpnInfo *pLPNs;
   // Following variables are used when ioUnitInPage == 1
   Bitset *pErasedBits;
   std::vector<Bitset> validBits;
-  uint64_t **ppLPNs; 
+  LpnInfo **ppLPNs; 
 
   // Following variables are used when ioUnitInPage > 1
   std::vector<Bitset> erasedBits;
   // ppLPNs[i][j]表示第i个物理页第j个压缩块的LPN.
   std::vector<std::vector<Bitset>> cvalidBits;
   // pppLPNs[i][j][k]表示第i个物理页第j个ioUnit第k个压缩块的LPN.
-  uint64_t ***pppLPNs;
+  LpnInfo ***pppLPNs;
 
   uint8_t maxCompressedPageCount;
 
@@ -95,11 +101,12 @@ class Block {
   uint32_t getDirtyPageCount();
   uint32_t getNextWritePageIndex();
   uint32_t getNextWritePageIndex(uint32_t);
-  bool getPageInfo(uint32_t, std::vector<uint64_t> &, Bitset &);
-  void getLPNs(uint32_t, std::vector<uint64_t>&, Bitset& bits, uint32_t);
+  bool getPageInfo(uint32_t, std::vector<LpnInfo> &, Bitset &);
+  void getLPNs(uint32_t, std::vector<LpnInfo>&, Bitset& bits, uint32_t);
+  LpnInfo getLPN(uint32_t, uint16_t, uint16_t);
   bool read(uint32_t, uint32_t, uint64_t);
   // bool write(uint32_t, uint64_t, uint32_t, uint64_t);
-  bool write(uint32_t, std::vector<uint64_t>&, Bitset& , uint32_t, uint64_t);
+  bool write(uint32_t, std::vector<LpnInfo>&, Bitset& , uint32_t, uint64_t);
   bool write(WriteInfo&);
   void erase();
   void invalidate(uint32_t, uint32_t);

@@ -359,7 +359,7 @@ uint64_t Disk::writeOrdinary(uint64_t offset, uint64_t length, uint8_t*  buffer)
       // panic("nvme_disk: Fail to seek to %" PRIu64 "\n", slba);
     }
 
-    uint64_t ret = disk.tellp();
+    ret = disk.tellp();
     disk.write((char *)buffer, length);
     ret = (uint64_t)disk.tellp() - offset;
   }
@@ -453,7 +453,7 @@ uint16_t CompressedDisk::write(uint64_t slba, uint16_t nlblk, uint8_t *buffer){
   uint64_t ret =  Disk::write(slba, nlblk, buffer);
   // I/O write Amplification
   uint64_t now_idx = (slba * sectorSize) / compress_unit_size;
-  while(now_idx * compress_unit_size < (slba + nlnlk) * sectorSize){
+  while(now_idx * compress_unit_size < (slba + nlblk) * sectorSize){
     if(isCompressed(now_idx)){
       compressed_table.erase(now_idx);
       debugprint(LOG_COMMON, "CompressedDiskWrite: OverRide Erase Compressed Data In %" PRIu64, now_idx);
@@ -464,20 +464,24 @@ uint16_t CompressedDisk::write(uint64_t slba, uint16_t nlblk, uint8_t *buffer){
   return ret;
 }
 
-void CompressedDisk::compressWrite(uint64_t idx, uint8_t* buffer){
+bool CompressedDisk::compressWrite(uint64_t idx, uint8_t* buffer){
+//ret 表示是否压缩成功
   if(isCompressed(idx)){
     panic("Error: Already Compressed");
   }
   else{
     uint64_t src_len = compress_unit_size;
     uint64_t dest_len = 0;
-    compressor->decompress(buffer, src_len, dest_len);
+    compressor->compress(buffer, src_len, dest_len);
+    if(dest_len == src_len) return false;
     compressed_table[idx] = dest_len;
-    debugprint(LOG_COMMON, "CompressWrite In CompressedDisk: idx = %" PRIu64 "src_len = %" PRIu64 "dest_len = %" PRIu64, idx, src_len, dest_len);
+    writeOrdinary(idx * compress_unit_size, compress_unit_size, compressor->buffer);
+    debugprint(LOG_COMMON, "CompressWrite In CompressedDisk: idx = %" PRIu64 " ,src_len = %" PRIu64 " ,dest_len = %" PRIu64, idx, src_len, dest_len);
   }
+  return true;
 }
 
-uint16_t CompressedDisk::erase(uint64_t slba, uint16_t nlblk) {
+uint16_t CompressedDisk::erase(uint64_t, uint16_t nlblk) {
   return nlblk;
 }
 

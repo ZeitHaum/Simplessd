@@ -27,7 +27,6 @@
 #include "util/bitset.hh"
 #include "lib/mytest/testclass.cc"
 
-#define DEBUG_TEST
 
 namespace SimpleSSD {
 
@@ -85,9 +84,6 @@ bool PageMapping::initialize() {
   Request req(param.ioUnitInPage);
 
   debugprint(LOG_FTL_PAGE_MAPPING, "Initialization started");
-  mytest::TestClass tc = mytest::TestClass();
-  tc.setIntToMax(stat.testThirdParty);
-  debugprint(LOG_FTL_PAGE_MAPPING, std::to_string(stat.testThirdParty).c_str());
 
   nTotalLogicalPages = param.totalLogicalBlocks * param.pagesInBlock;
   nPagesToWarmup =
@@ -199,53 +195,34 @@ void PageMapping::read(Request &req, uint64_t &tick) {
   this->cd_info = &req.cd_info;
 
   if (req.ioFlag.count() > 0) {
-    #ifdef DEBUG_TEST
       /*
       Test 1 Begin
       GarbageCollection 0 Block.
       And Read.
-      *//*
-      Test 1 Begin
-      GarbageCollection 0 Block.
-      And Read.
       */
-      if(cd_info->pDisk && req.lpn == 0 && req.ioFlag.test(4) && ((CompressedDisk*)(cd_info->pDisk))->isCompressed(1)){
-        Request test_req = Request(param.ioUnitInPage);
-        test_req.lpn = 0;
-        test_req.ioFlag.set();
-        readInternal(test_req, tick);
-        vector<uint32_t> bl(1, 0);
-        doGarbageCollection(bl, tick);
-        readInternal(test_req, tick);
-      } 
+      // if(cd_info->pDisk && req.lpn == 0 && req.ioFlag.test(4)){
+      //   Request test_req = Request(param.ioUnitInPage);
+      //   test_req.lpn = 0;
+      //   test_req.ioFlag.set();
+      //   readInternal(test_req, tick);
+      //   if(!blocks.empty()){
+      //     std::vector<uint32_t> bl(0);
+      //     for(uint32_t i = 0; i<param.pagesInBlock; ++i){
+      //       auto it = blocks.find(i);
+      //       if(it != blocks.end() && it->second.getNextWritePageIndex() == param.pagesInBlock){
+      //         bl.push_back(it->second.getBlockIndex());
+      //         break;
+      //       }
+      //     }
+      //     if(!bl.empty()){
+      //       doGarbageCollection(bl, tick);
+      //     }
+      //   }
+      //   readInternal(test_req, tick);
+      // } 
       /*
       Test 1 End
       */
-      /*
-      Test 2 Begin
-      Multi Read And Write And Compress On Logic Block 0.
-      */
-      // Request test_req = Request(param.ioUnitInPage);
-      // test_req.lpn = 0;
-      // test_req.ioFlag.set();
-      // readInternal(test_req, tick);
-      // vector<uint32_t> bl(1, 0);
-      // doGarbageCollection(bl, tick);
-      // // Repeat Write
-      // Request test_write_req = Request(param.ioUnitInPage);
-      // test_write_req.lpn = 0;
-      // for(uint32_t idx = 0; idx < 8; idx++){
-      //   test_write_req.ioFlag.set(idx);
-      // }
-      // writeInternal(test_write_req, tick);
-      // readInternal(test_req, tick);
-      // bl[0] = 9537;
-      // doGarbageCollection(bl, tick);
-      // readInternal(test_req, tick);
-      /*
-      Test 2 End
-      */
-    #endif
     readInternal(req, tick);
 
     debugprint(LOG_FTL_PAGE_MAPPING,
@@ -557,7 +534,7 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
   std::vector<PAL::Request> readRequests;
   std::vector<PAL::Request> writeRequests;
   std::vector<PAL::Request> eraseRequests;
-  std::vector<uint64_t> lpns;
+  std::vector<LpnInfo> lpns;
   Bitset bit(param.ioUnitInPage);
   uint64_t beginAt;
   uint64_t readFinishedAt = tick;
@@ -610,7 +587,6 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
     }
 
     // Copy valid pages to free block
-    // TODO: 由于LastFreeBlock的机制不允许跨块压缩, 是否可以改进?
     for (uint32_t pageIndex = 0; pageIndex < param.pagesInBlock; pageIndex++) {
       // Valid?
       if (block->second.getPageInfo(pageIndex, lpns, bit)) {
@@ -631,14 +607,14 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
         // Update mapping table
         uint32_t newBlockIdx = freeBlock->first;
 
-        bool is_filled = true;
         uint32_t nowPageCnt = 0;
         uint32_t nowPageIdx = 0;
         uint32_t nowOffset = 0;
 
         for (uint32_t idx = 0; idx < bitsetSize; idx++) {
+          bool is_filled = true;
           if (bit.test(idx)) {
-            auto mappingList = table.find(lpns.at(idx));
+            auto mappingList = table.find(lpns.at(idx).lpn);
 
             if (mappingList == table.end()) {
               panic("Invalid mapping table entry");
@@ -646,7 +622,7 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
 
             pDRAM->read(&(*mappingList), 12 * param.ioUnitInPage, tick);
 
-            auto &mapping = mappingList->second.at(idx);
+            auto &mapping = mappingList->second.at(lpns.at(idx).idx);
             CompressInfo* c_info = (CompressInfo*) &(std::get<2>(mapping));
             if(c_info -> is_compressed == 0x1){
               if(w_info.valid){
@@ -667,8 +643,33 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
               //DONOTHING ON Compressed Info.
             }
             else{
+              std::get<0>(mapping) = newBlockIdx;
+              std::get<1>(mapping) = nowPageIdx;
+              //Get Compressed Length
+              uint64_t idxSize = param.pageSize / param.ioUnitInPage;
+              uint64_t CompressedLength = idxSize;
+              uint64_t disk_offset = (lpns.at(idx).lpn * param.ioUnitInPage + lpns.at(idx).idx) * idxSize - cd_info->offset;
+              uint64_t disk_length = idxSize;
+              CompressedDisk* pcDisk = ((CompressedDisk*)(cd_info->pDisk));
+              if(cd_info->pDisk){
+                CompressedLength = pcDisk->getCompressedLength(disk_offset/idxSize);
+              }
+              if(CompressedLength == idxSize){
+                //Need Compress
+                pcDisk -> readOrdinary(disk_offset, disk_length, compressedBuffer);
+                bool is_comp = pcDisk -> compressWrite(disk_offset / idxSize, compressedBuffer);
+                if(is_comp){
+                  debugprint(LOG_FTL_PAGE_MAPPING, "Compressed Trigged In GC! pageIndex =%" PRIu64 ", idx = %" PRIu64, pageIndex, idx);
+                }
+              }
+              CompressedLength = pcDisk->getCompressedLength(disk_offset/idxSize);
+              assert(CompressedLength <= idxSize && "FTLGC Error: compressed Trigged Failed.");
+              // |= 处理w_info初始值赋值的情况
+              is_filled |= (nowOffset + CompressedLength > idxSize) || (w_info.invalidate_idxs.size() >= 8);
               if(is_filled){
-                if(w_info.valid) write_submit(w_info, freeBlock);
+                if(w_info.valid) {
+                  write_submit(w_info, freeBlock);
+                }
                 nowPageIdx = freeBlock->second.getNextWritePageIndex(idx);
                 nowPageCnt = 0;
                 nowOffset = 0;
@@ -679,34 +680,14 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                 w_info.validmask.reset();
                 w_info.beginAt = beginAt;
               }
-              std::get<0>(mapping) = newBlockIdx;
-              std::get<1>(mapping) = nowPageIdx;
-              //Get Compressed Length
-              uint64_t idxSize = param.pageSize / param.ioUnitInPage;
-              uint64_t CompressedLength = idxSize ;
-              uint64_t disk_offset = (pageIndex * param.ioUnitInPage + idx) * idxSize - cd_info->offset;
-              uint64_t disk_length = idxSize;
-              CompressedDisk* pcDisk = ((CompressedDisk*)(cd_info->pDisk));
-              if(cd_info->pDisk){
-                CompressedLength = pcDisk->getCompressedLength(disk_offset/idxSize);
-              }
-              if(CompressedLength == idxSize){
-                //Need Compress
-                pcDisk -> readOriginal(disk_offset, disk_length, compressedBuffer);
-                pcDisk -> compressWrite(disk_offset / idxSize, compressedBuffer);
-                debugprint(LOG_FTL_PAGE_MAPPING, "Compressed Trigged In GC! pageIndex =%" PRIu64 ", idx = %" PRIu64, pageIndex, idx);
-                CompressedLength = pcDisk->getCompressedLength(disk_offset/idxSize);
-              }
-              assert(CompressedLength < idxSize && "FTLGC Error: compressed Trigged Failed.");
-              c_info->is_compressed = 0x1;
+              nowOffset += CompressedLength;
+              c_info->is_compressed = (CompressedLength < idxSize);
               c_info->c_ind = nowPageCnt++;
               c_info->offset = nowOffset;
               assert(CompressedLength <= (1 << 26));
               c_info->length = CompressedLength;
               c_info->idx = w_info.idx;
-              nowOffset += CompressedLength;
-              is_filled = nowOffset >= idxSize || w_info.invalidate_idxs.size() == 7;
-              vector<uint64_t> t_lpn(8, 0);
+              vector<LpnInfo> t_lpn(8, {0, 0});
               Bitset t_bst(8);
               block->second.getLPNs(pageIndex, t_lpn, t_bst,idx);
               assert((t_lpn.size() == 8 && t_bst.test(0)));
@@ -718,6 +699,10 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
 
             stat.validPageCopies++;//Invalid
           }
+        }
+        // 禁止跨页
+        if(w_info.valid){
+          write_submit(w_info, freeBlock);
         }
 
         stat.validSuperPageCopies++;//Invalid
@@ -824,9 +809,6 @@ void PageMapping::readInternal(Request &req, uint64_t &tick) {
   }
 }
 
-//Used for GC only
-
-
 void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
   PAL::Request palRequest(req);
   std::unordered_map<uint32_t, Block>::iterator block;
@@ -889,7 +871,7 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
 
   //First Write Don't Compress.
   Bitset validmask = Bitset(8);
-  vector<uint64_t> lpns(8, 0);
+  vector<LpnInfo> lpns(8, {0, 0});
   validmask.set(0);
   for (uint32_t idx = 0; idx < bitsetSize; idx++) {
     if (req.ioFlag.test(idx) || !bRandomTweak) {
@@ -899,7 +881,7 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
       beginAt = tick;
       
       //first write, write 0.
-      lpns[0] = req.lpn;
+      lpns[0] = {req.lpn, idx};
       block->second.write(pageIndex, lpns, validmask, idx, beginAt);
 
       // Read old data if needed (Only executed when bRandomTweak = false)

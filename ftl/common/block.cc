@@ -45,9 +45,9 @@ Block::Block(uint32_t blockIdx, uint32_t count, uint32_t ioUnit)
     Bitset copy(maxCompressedPageCount);
     validBits = std::vector<Bitset>(pageCount, copy);
 
-    ppLPNs = (uint64_t **)calloc(pageCount, sizeof(uint64_t*));
+    ppLPNs = (LpnInfo **)calloc(pageCount, sizeof(LpnInfo*));
     for(uint32_t i = 0; i<pageCount; i++){
-      ppLPNs[i] = (uint64_t* ) calloc(maxCompressedPageCount, sizeof(uint64_t *));
+      ppLPNs[i] = (LpnInfo* ) calloc(maxCompressedPageCount, sizeof(LpnInfo *));
     }
   }
   else if (ioUnitInPage > 1) {
@@ -57,12 +57,12 @@ Block::Block(uint32_t blockIdx, uint32_t count, uint32_t ioUnit)
     Bitset validcopy(maxCompressedPageCount);
     cvalidBits = std::vector<std::vector<Bitset>>(pageCount, std::vector<Bitset>(ioUnitInPage, validcopy));
 
-    pppLPNs = (uint64_t ***)calloc(pageCount, sizeof(uint64_t **));
+    pppLPNs = (LpnInfo ***)calloc(pageCount, sizeof(LpnInfo **));
 
     for (uint32_t i = 0; i < pageCount; i++) {
-      pppLPNs[i] = (uint64_t **)calloc(ioUnitInPage, sizeof(uint64_t*));
+      pppLPNs[i] = (LpnInfo **)calloc(ioUnitInPage, sizeof(LpnInfo*));
       for(uint32_t j = 0; j < ioUnitInPage; j++){
-        pppLPNs[i][j] = (uint64_t *) calloc(maxCompressedPageCount, sizeof(uint64_t));
+        pppLPNs[i][j] = (LpnInfo *) calloc(maxCompressedPageCount, sizeof(LpnInfo));
       }
     }
   }
@@ -310,8 +310,9 @@ uint32_t Block::getNextWritePageIndex(uint32_t idx) {
   return pNextWritePageIndex[idx];
 }
 
-bool Block::getPageInfo(uint32_t pageIndex, std::vector<uint64_t> &lpn,
+bool Block::getPageInfo(uint32_t pageIndex, std::vector<LpnInfo> &lpn,
                         Bitset &map) {
+  lpn.clear();
   if (ioUnitInPage == 1 && map.size() == 1) {
     if(validBits[pageIndex].any()){
       map.set();
@@ -346,7 +347,7 @@ bool Block::getPageInfo(uint32_t pageIndex, std::vector<uint64_t> &lpn,
 }
 
 
-void Block::getLPNs(uint32_t pageIndex, std::vector<uint64_t>&lpn, Bitset& bits, uint32_t idx){
+void Block::getLPNs(uint32_t pageIndex, std::vector<LpnInfo>&lpn, Bitset& bits, uint32_t idx){
   assert(lpn.size() == maxCompressedPageCount);
   if(ioUnitInPage == 1){
     for(uint32_t i = 0; i<maxCompressedPageCount; ++i){
@@ -364,6 +365,17 @@ void Block::getLPNs(uint32_t pageIndex, std::vector<uint64_t>&lpn, Bitset& bits,
       }
       lpn[i] = pppLPNs[pageIndex][idx][i];
     }
+  }
+}
+
+LpnInfo Block::getLPN(uint32_t pageIndex, uint16_t idx, uint16_t comp_ind){
+  assert(comp_ind < maxCompressedPageCount);
+  assert(idx < ioUnitInPage);
+  if(ioUnitInPage == 1){
+    return ppLPNs[pageIndex][comp_ind];
+  }
+  else{
+    return pppLPNs[pageIndex][idx][comp_ind];
   }
 }
 
@@ -391,7 +403,7 @@ bool Block::write(WriteInfo& w_info){
   return Block::write(w_info.pageIndex, w_info.lpns, w_info.validmask,  w_info.idx, w_info.beginAt);
 }
 
-bool Block::write(uint32_t pageIndex, std::vector<uint64_t>&lpns, Bitset& validmask,uint32_t idx,
+bool Block::write(uint32_t pageIndex, std::vector<LpnInfo>&lpns, Bitset& validmask,uint32_t idx,
                   uint64_t tick) {
   bool write = false;
 
