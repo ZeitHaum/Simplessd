@@ -37,6 +37,7 @@ typedef struct {
   uint32_t pageSize;      //!< Mapping unit (PAL::Parameter::superPageSize)
   uint32_t ioUnitInPage;  //!< # smallest I/O unit in one page
   uint32_t pageCountToMaxPerf;  //!< # pages to fully utilize internal parallism
+  uint32_t maxCompressUnitInPage;
 } Parameter;
 
 class FTL : public StatObject {
