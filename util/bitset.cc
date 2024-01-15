@@ -148,6 +148,12 @@ void Bitset::flip(uint32_t idx) noexcept {
                   (data[idx / 8] & ~(0x01 << (idx % 8)));
 }
 
+void Bitset::copy(const Bitset& bit){
+  this->dataSize = bit.dataSize;
+  this->allocSize = bit.allocSize;
+  memcpy(this->data, bit.data, bit.allocSize);
+}
+
 bool Bitset::operator[](uint32_t idx) noexcept {
   return test(idx);
 }

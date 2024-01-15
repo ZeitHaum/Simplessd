@@ -41,6 +41,7 @@ struct WriteInfo{
   std::vector<uint64_t> invalidate_idxs;
   std::vector<uint64_t> invalidate_blocks;
   std::vector<uint64_t> invalidate_pages;
+  std::vector<uint64_t> invalidate_cinds;
   uint32_t idx;
   uint32_t validcount;
   uint64_t beginAt;
@@ -101,7 +102,7 @@ class Block {
   uint32_t getDirtyPageCount();
   uint32_t getNextWritePageIndex();
   uint32_t getNextWritePageIndex(uint32_t);
-  bool getPageInfo(uint32_t, std::vector<LpnInfo> &, Bitset &);
+  bool getPageInfo(uint32_t, std::vector<std::vector<LpnInfo>> &, std::vector<Bitset> &);
   void getLPNs(uint32_t, std::vector<LpnInfo>&, Bitset& bits, uint32_t);
   LpnInfo getLPN(uint32_t, uint16_t, uint16_t);
   bool read(uint32_t, uint32_t, uint64_t);

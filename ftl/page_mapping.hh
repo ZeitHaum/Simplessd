@@ -93,7 +93,7 @@ class PageMapping : public AbstractFTL {
   void calculateVictimWeight(std::vector<std::pair<uint32_t, float>> &,
                              const EVICT_POLICY, uint64_t);
   void selectVictimBlock(std::vector<uint32_t> &, uint64_t &);
-  void doGarbageCollection(std::vector<uint32_t> &, uint64_t &);
+  void doGarbageCollection(std::vector<uint32_t> &, uint64_t &);  
 
   float calculateWearLeveling();
   void calculateTotalPages(uint64_t &, uint64_t &);

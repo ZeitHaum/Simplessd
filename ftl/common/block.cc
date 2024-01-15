@@ -310,40 +310,40 @@ uint32_t Block::getNextWritePageIndex(uint32_t idx) {
   return pNextWritePageIndex[idx];
 }
 
-bool Block::getPageInfo(uint32_t pageIndex, std::vector<LpnInfo> &lpn,
-                        Bitset &map) {
-  lpn.clear();
-  if (ioUnitInPage == 1 && map.size() == 1) {
-    if(validBits[pageIndex].any()){
-      map.set();
-    }
-    // lpn = std::vector<uint64_t>(1, pLPNs[pageIndex]);
-    for(uint32_t i = 0; i<maxCompressedPageCount; ++i){
-      if(validBits[pageIndex].test(i)){
-        lpn.push_back(ppLPNs[pageIndex][i]);
-      }
-    }
+bool Block::getPageInfo(uint32_t pageIndex, std::vector<std::vector<LpnInfo>> &lpns,
+                        std::vector<Bitset> &bits) {
+  //Check Size
+  assert(lpns.size() == ioUnitInPage);
+  assert(bits.size() == ioUnitInPage);
+  for(uint32_t i = 0; i<lpns.size(); ++i){
+    assert(lpns[i].size() == maxCompressedPageCount);
+    assert(bits[i].size() == maxCompressedPageCount);
   }
-  else if (map.size() == ioUnitInPage) {
-    map = Bitset(ioUnitInPage);
+  //Get Info
+  bool ret = false;
+  if (ioUnitInPage == 1) {
+    bits[0].copy(validBits[pageIndex]);
+    for(uint32_t i = 0; i<maxCompressedPageCount; ++i){
+      lpns[0][i] = ppLPNs[pageIndex][i];
+    }
+    ret = bits[0].any();
+  }
+  else if(ioUnitInPage > 1){
     for(uint32_t i = 0; i<ioUnitInPage; i++){
-      if(cvalidBits[pageIndex][i].any()){
-        map.set(i);
-      }
+      bits[i].copy(cvalidBits[pageIndex][i]);
       for(uint32_t j = 0; j<maxCompressedPageCount; ++j){
-        if(cvalidBits[pageIndex][i].test(j)){
-          lpn.push_back(pppLPNs[pageIndex][i][j]);
-        }
+        lpns[i][j] = pppLPNs[pageIndex][i][j];
       }
+      ret |= bits[i].any();
     }
     // lpn = std::vector<uint64_t>(ppLPNs[pageIndex],
                                 // ppLPNs[pageIndex] + ioUnitInPage);
   }
-  else {
-    panic("I/O map size mismatch");
+  else{
+    panic("ioUnit is 0.");
   }
 
-  return map.any();
+  return ret;
 }
 
 

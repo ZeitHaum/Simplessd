@@ -55,6 +55,7 @@ class Bitset {
   void reset(uint32_t) noexcept;
   void flip() noexcept;
   void flip(uint32_t) noexcept;
+  void copy(const Bitset&);
 
   bool operator[](uint32_t) noexcept;
   Bitset &operator&=(const Bitset &);
