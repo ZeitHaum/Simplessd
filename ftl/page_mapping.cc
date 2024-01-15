@@ -638,7 +638,7 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                 uint64_t idxSize = param.pageSize / param.ioUnitInPage;
                 uint64_t CompressedLength = idxSize;
                 //Get Compressed Length
-                if(c_info->is_compressed == 0x1){
+                if(c_info->is_compressed == 0x0){
                   //Not Compressed, Need Compress.
                   uint64_t disk_offset = (lpn_info.lpn * param.ioUnitInPage + lpn_info.idx) * idxSize - cd_info->offset;
                   uint64_t disk_length = idxSize;
@@ -681,9 +681,9 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                 std::get<1>(mapping) = nowPageIdx;
                 nowOffset += CompressedLength;
                 c_info->is_compressed = (CompressedLength < idxSize);
+                assert(CompressedLength <= idxSize);
                 c_info->c_ind = nowPageCnt++;
                 c_info->offset = nowOffset;
-                assert(CompressedLength <= (1 << 26));
                 c_info->length = CompressedLength;
                 c_info->idx = w_info.idx;
                 vector<LpnInfo> t_lpn(8, {0, 0});
