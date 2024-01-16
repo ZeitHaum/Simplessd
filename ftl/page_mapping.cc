@@ -25,7 +25,6 @@
 
 #include "util/algorithm.hh"
 #include "util/bitset.hh"
-#include "lib/mytest/testclass.cc"
 
 
 namespace SimpleSSD {
@@ -195,34 +194,6 @@ void PageMapping::read(Request &req, uint64_t &tick) {
   this->cd_info = &req.cd_info;
 
   if (req.ioFlag.count() > 0) {
-      /*
-      Test 1 Begin
-      GarbageCollection 0 Block.
-      And Read.
-      */
-      // if(cd_info->pDisk && req.lpn == 0 && req.ioFlag.test(4)){
-      //   Request test_req = Request(param.ioUnitInPage);
-      //   test_req.lpn = 0;
-      //   test_req.ioFlag.set();
-      //   readInternal(test_req, tick);
-      //   if(!blocks.empty()){
-      //     std::vector<uint32_t> bl(0);
-      //     for(uint32_t i = 0; i<param.pagesInBlock; ++i){
-      //       auto it = blocks.find(i);
-      //       if(it != blocks.end() && it->second.getNextWritePageIndex() == param.pagesInBlock){
-      //         bl.push_back(it->second.getBlockIndex());
-      //         break;
-      //       }
-      //     }
-      //     if(!bl.empty()){
-      //       doGarbageCollection(bl, tick);
-      //     }
-      //   }
-      //   readInternal(test_req, tick);
-      // } 
-      /*
-      Test 1 End
-      */
     readInternal(req, tick);
 
     debugprint(LOG_FTL_PAGE_MAPPING,

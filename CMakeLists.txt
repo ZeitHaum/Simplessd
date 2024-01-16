@@ -43,10 +43,6 @@ if (NOT EXISTS "${PROJECT_SOURCE_DIR}/lib/mcpat/mcpat.h")
 Check you initialized submodules.")
 endif ()
 
-if (NOT EXISTS "${PROJECT_SOURCE_DIR}/lib/mytest/testclass.h")
-  message(FATAL_ERROR "Failed to find mytest library. \
-Check you initialized submodules.")
-endif ()
 if (NOT EXISTS "${PROJECT_SOURCE_DIR}/lib/lz4/lib/lz4.h")
   message(FATAL_ERROR "Failed to find lz4 library. \
 Check you initialized submodules.")
@@ -54,7 +50,6 @@ endif ()
 
 # Add subproject
 add_subdirectory(${PROJECT_SOURCE_DIR}/lib/mcpat)
-add_subdirectory(${PROJECT_SOURCE_DIR}/lib/mytest)
 add_subdirectory(${PROJECT_SOURCE_DIR}/lib/lz4/build/cmake)
 
 # Set include directories
@@ -63,7 +58,6 @@ include_directories(
   ${PROJECT_SOURCE_DIR}/lib/mcpat
   ${PROJECT_SOURCE_DIR}/lib/mcpat/cacti
   ${PROJECT_SOURCE_DIR}/lib/inih
-  ${PROJECT_SOURCE_DIR}/lib/mytest
   ${PROJECT_SOURCE_DIR}/lib/lz4/lib
   ${DRAMPOWER_SOURCE_DIR}
 )
@@ -212,4 +206,4 @@ add_library(simplessd STATIC
 )
 
 link_directories(${PROJECT_SOURCE_DIR}/lib/lz4/lib/)
-target_link_libraries(simplessd mcpat mytest lz4)
+target_link_libraries(simplessd mcpat lz4)
