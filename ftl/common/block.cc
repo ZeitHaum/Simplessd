@@ -433,14 +433,7 @@ bool Block::write(uint32_t pageIndex, std::vector<LpnInfo>&lpns, Bitset& validma
         panic("Idx greater than IoUnitInPage");
       }
       pErasedBits->reset(pageIndex);
-      for(uint32_t i = 0; i<maxCompressedPageCount; ++i){
-        if(validmask.test(i)) {
-          validBits[pageIndex].set(i);
-        }
-        else{
-          validBits[pageIndex].reset(i);
-        }
-      }
+      validBits[pageIndex].copy(validmask);
 
       for(uint32_t i = 0; i<lpns.size(); ++i){
         ppLPNs[pageIndex][i] = lpns[i];
@@ -448,15 +441,7 @@ bool Block::write(uint32_t pageIndex, std::vector<LpnInfo>&lpns, Bitset& validma
     }
     else {
       erasedBits.at(pageIndex).reset(idx);
-      for(uint32_t i = 0; i<maxCompressedPageCount; ++i){
-        if(validmask.test(i)) {
-          cvalidBits[pageIndex][idx].set(i);
-        }
-        else{
-          cvalidBits[pageIndex][idx].reset(i);
-        }
-      }
-      
+      cvalidBits[pageIndex][idx].copy(validmask);
       for(uint32_t i = 0; i<lpns.size(); ++i){
         pppLPNs[pageIndex][idx][i] = lpns[i];
       }

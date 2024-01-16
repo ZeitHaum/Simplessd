@@ -690,11 +690,13 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                 Bitset t_bst(8);
                 block->second.getLPNs(pageIndex, t_lpn, t_bst,idx);
                 assert((t_lpn.size() == 8 && t_bst.test(0)));
+                w_info.validmask.set(w_info.validcount);
                 w_info.lpns.at(w_info.validcount++) = t_lpn[0];
                 w_info.invalidate_blocks.push_back((uint64_t)(iter));
                 w_info.invalidate_idxs.push_back(idx);
                 w_info.invalidate_pages.push_back(pageIndex);
                 w_info.invalidate_cinds.push_back(cIdx);
+                debugprint(LOG_FTL_PAGE_MAPPING, "Move LPN %" PRIu64 "From Block %" PRIu64 "Page %" PRIu64 "Idx %" PRIu64 "Cind %" PRIu64 "To Block %" PRIu64 "Page %" PRIu64 "Idx %" PRIu64 "Cind %" PRIu64, t_lpn[0], (uint64_t)(iter), pageIndex, idx, cIdx, newBlockIdx, nowPageIdx, c_info->idx, c_info->c_ind);
               }  
             }
 

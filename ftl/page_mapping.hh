@@ -37,6 +37,12 @@ namespace FTL {
 
 class PageMapping : public AbstractFTL {
  private:
+  struct PhysicalAddress{
+    uint32_t blockIndex;
+    uint32_t pageIndex; //may be superpage
+    uint16_t iounitIndex; // used in superpage
+    uint16_t compressedunitIndex; // used in compressed
+  };
   struct CompressInfo{
     uint64_t is_compressed : 1;
     uint64_t c_ind : 3;// max 8 page in a physical page
