@@ -34,32 +34,68 @@ struct LpnInfo{
   uint32_t idx;
 }; 
 
-struct WriteInfo{
-  bool valid;
-  uint32_t pageIndex;
-  std::vector<LpnInfo> lpns;
-  std::vector<uint64_t> invalidate_idxs;
-  std::vector<uint64_t> invalidate_blocks;
-  std::vector<uint64_t> invalidate_pages;
-  std::vector<uint64_t> invalidate_cinds;
-  uint32_t idx;
-  uint32_t validcount;
-  uint64_t beginAt;
-  Bitset validmask;
-  uint8_t maxCompressedPageCount;
-  WriteInfo(uint8_t mcpn):
-    valid(false), 
-    validcount(0),
-    maxCompressedPageCount(mcpn)
-  {
-    lpns = std::vector<LpnInfo>(maxCompressedPageCount, {0, 0});
-    validmask = Bitset(maxCompressedPageCount);
-  }
-};
+struct BlockStat{
+  uint64_t totalDataLength;
+  uint64_t validDataLength;
+  uint64_t validIoUnitCount;
+  uint64_t compressUnitCount;
+  uint64_t totalUnitCount;
+  
+  BlockStat() = default;
 
+  BlockStat(const BlockStat& other) = default;
+
+  BlockStat(BlockStat&& other) noexcept
+      : totalDataLength(other.totalDataLength),
+        validDataLength(other.validDataLength),
+        validIoUnitCount(other.validIoUnitCount),
+        compressUnitCount(other.compressUnitCount),
+        totalUnitCount(other.totalUnitCount) {
+    // No pointer need to handle
+  }
+
+  BlockStat& operator=(const BlockStat& other) = default;
+
+  BlockStat& operator=(BlockStat&& other) noexcept = default;
+
+  void copy(const BlockStat& other){
+    totalDataLength = other.totalDataLength;
+    validDataLength = other.validDataLength;
+    validIoUnitCount = other.validIoUnitCount;
+    compressUnitCount = other.compressUnitCount;
+    totalUnitCount = other.totalUnitCount;
+  }
+  void reset(){
+    totalDataLength = 0;
+    validDataLength = 0;
+    validIoUnitCount = 0;
+    compressUnitCount = 0;
+    totalUnitCount = 0;
+  }
+  BlockStat operator+(const BlockStat& other) const {
+    BlockStat result;
+    result.totalDataLength = totalDataLength + other.totalDataLength;
+    result.validDataLength = validDataLength + other.validDataLength;
+    result.validIoUnitCount = validIoUnitCount + other.validIoUnitCount;
+    result.compressUnitCount = compressUnitCount + other.compressUnitCount;
+    result.totalUnitCount = totalUnitCount + other.totalUnitCount;
+    return result;
+  }
+  BlockStat& operator+=(const BlockStat& other) {
+    totalDataLength += other.totalDataLength;
+    validDataLength += other.validDataLength;
+    validIoUnitCount += other.validIoUnitCount;
+    compressUnitCount += other.compressUnitCount;
+    totalUnitCount += other.totalUnitCount;
+    return *this;
+  }
+
+};
 
 class Block {
  private:
+  static uint32_t iounitSize;
+  static uint16_t maxCompressedPageCount;
   uint32_t idx;
   uint32_t pageCount;
   uint32_t ioUnitInPage;
@@ -80,10 +116,10 @@ class Block {
   // pppLPNs[i][j][k]表示第i个物理页第j个ioUnit第k个压缩块的LPN.
   LpnInfo ***pppLPNs;
 
-  uint8_t maxCompressedPageCount;
-
   uint64_t lastAccessed;
   uint32_t eraseCount;
+
+  BlockStat blockstat;
 
  public:
   Block(uint32_t, uint32_t, uint32_t);
@@ -107,11 +143,16 @@ class Block {
   LpnInfo getLPN(uint32_t, uint16_t, uint16_t);
   bool read(uint32_t, uint32_t, uint64_t);
   // bool write(uint32_t, uint64_t, uint32_t, uint64_t);
-  bool write(uint32_t, std::vector<LpnInfo>&, Bitset& , uint32_t, uint64_t);
-  bool write(WriteInfo&);
+  bool write(uint32_t, std::vector<LpnInfo>&, std::vector<uint32_t>&,  Bitset& , uint32_t, uint64_t);
+  void updateStatWrite(std::vector<uint32_t>&lens, Bitset& validmask);
+  static void setStaticAttr(uint32_t , uint16_t);
   void erase();
-  void invalidate(uint32_t, uint32_t);
-  void invalidate(uint32_t, uint32_t, uint8_t);
+  bool isvalid(uint32_t, uint16_t);
+  bool isvalid(uint32_t, uint16_t, uint16_t);
+  // void invalidate(uint32_t, uint16_t);
+  void invalidate(uint32_t, uint16_t, uint16_t, uint32_t);
+  void updateStatInvalidate(uint32_t len);
+  const BlockStat& getBlockStat(); //getter
 };
 
 }  // namespace FTL

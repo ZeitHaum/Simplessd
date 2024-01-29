@@ -27,6 +27,11 @@ namespace SimpleSSD {
 
 namespace FTL {
 
+//initialize static variable
+uint32_t Block::iounitSize = 0;
+uint16_t Block::maxCompressedPageCount = 0;
+
+
 Block::Block(uint32_t blockIdx, uint32_t count, uint32_t ioUnit)
     : idx(blockIdx),
       pageCount(count),
@@ -36,9 +41,11 @@ Block::Block(uint32_t blockIdx, uint32_t count, uint32_t ioUnit)
       pErasedBits(nullptr),
       ppLPNs(nullptr),
       pppLPNs(nullptr),
-      maxCompressedPageCount(8),
       lastAccessed(0),
       eraseCount(0) {
+  if(Block::iounitSize == 0 || Block::maxCompressedPageCount == 0){
+    panic("Block static attrs doesn't initialize");
+  }
   if (ioUnitInPage == 1) {
     pErasedBits = new Bitset(pageCount);
 
@@ -75,6 +82,7 @@ Block::Block(uint32_t blockIdx, uint32_t count, uint32_t ioUnit)
 
   erase();
   eraseCount = 0;
+  blockstat.reset();
 }
 
 Block::Block(const Block &old)
@@ -104,6 +112,7 @@ Block::Block(const Block &old)
          ioUnitInPage * sizeof(uint32_t));
 
   eraseCount = old.eraseCount;
+  blockstat.copy(old.blockstat);
 }
 
 Block::Block(Block &&old) noexcept
@@ -119,9 +128,9 @@ Block::Block(Block &&old) noexcept
       erasedBits(std::move(old.erasedBits)),
       cvalidBits(std::move(old.cvalidBits)),
       pppLPNs(std::move(old.pppLPNs)),
-      maxCompressedPageCount(8),
       lastAccessed(std::move(old.lastAccessed)),
-      eraseCount(std::move(old.eraseCount)) {
+      eraseCount(std::move(old.eraseCount)),
+      blockstat(std::move(old.blockstat)) {
   // TODO Use std::exchange to set old value to null (C++14)
   old.idx = 0;
   old.pageCount = 0;
@@ -134,6 +143,7 @@ Block::Block(Block &&old) noexcept
   old.pppLPNs = nullptr;
   old.lastAccessed = 0;
   old.eraseCount = 0;
+  old.blockstat.reset();
 }
 
 Block::~Block() {
@@ -196,9 +206,9 @@ Block &Block::operator=(Block &&rhs) {
     erasedBits = std::move(rhs.erasedBits);
     ppLPNs = std::move(rhs.ppLPNs);
     pppLPNs = std::move(rhs.pppLPNs);
-    maxCompressedPageCount = 8;
     lastAccessed = std::move(rhs.lastAccessed);
     eraseCount = std::move(rhs.eraseCount);
+    blockstat = std::move(rhs.blockstat);
 
     rhs.pNextWritePageIndex = nullptr;
     rhs.pValidBits = nullptr;
@@ -208,6 +218,7 @@ Block &Block::operator=(Block &&rhs) {
     rhs.pppLPNs = nullptr;
     rhs.lastAccessed = 0;
     rhs.eraseCount = 0;
+    rhs.blockstat.reset();
   }
 
   return *this;
@@ -336,8 +347,6 @@ bool Block::getPageInfo(uint32_t pageIndex, std::vector<std::vector<LpnInfo>> &l
       }
       ret |= bits[i].any();
     }
-    // lpn = std::vector<uint64_t>(ppLPNs[pageIndex],
-                                // ppLPNs[pageIndex] + ioUnitInPage);
   }
   else{
     panic("ioUnit is 0.");
@@ -350,19 +359,15 @@ bool Block::getPageInfo(uint32_t pageIndex, std::vector<std::vector<LpnInfo>> &l
 void Block::getLPNs(uint32_t pageIndex, std::vector<LpnInfo>&lpn, Bitset& bits, uint32_t idx){
   assert(lpn.size() == maxCompressedPageCount);
   if(ioUnitInPage == 1){
+    bits.copy(validBits.at(pageIndex));
     for(uint32_t i = 0; i<maxCompressedPageCount; ++i){
-      if(validBits.at(pageIndex).test(i)){
-        bits.set(i);
-      }
       lpn[i] = ppLPNs[pageIndex][i];
     }
   }
   else{
     assert(idx < ioUnitInPage);
+    bits.copy(cvalidBits[pageIndex][idx]);
     for(uint32_t i = 0; i<maxCompressedPageCount; ++i){
-      if(cvalidBits.at(pageIndex).at(idx).test(i)){
-        bits.set(i);
-      }
       lpn[i] = pppLPNs[pageIndex][idx][i];
     }
   }
@@ -399,11 +404,7 @@ bool Block::read(uint32_t pageIndex, uint32_t idx, uint64_t tick) {
   return read;
 }
 
-bool Block::write(WriteInfo& w_info){
-  return Block::write(w_info.pageIndex, w_info.lpns, w_info.validmask,  w_info.idx, w_info.beginAt);
-}
-
-bool Block::write(uint32_t pageIndex, std::vector<LpnInfo>&lpns, Bitset& validmask,uint32_t idx,
+bool Block::write(uint32_t pageIndex, std::vector<LpnInfo>&lpns, std::vector<uint32_t>&lens, Bitset& validmask,uint32_t idx, 
                   uint64_t tick) {
   bool write = false;
 
@@ -448,12 +449,31 @@ bool Block::write(uint32_t pageIndex, std::vector<LpnInfo>&lpns, Bitset& validma
     }
 
     pNextWritePageIndex[idx] = pageIndex + 1;
+    //update blockstat
+    updateStatWrite(lens, validmask);
   }
   else {
     panic("Write to non erased page");
   }
 
   return write;
+}
+
+void Block::updateStatWrite(std::vector<uint32_t>&lens, Bitset& validmask){
+  for(uint16_t i = 0; i<maxCompressedPageCount; ++i){
+    if(validmask.test(i)){
+      //update blockstat
+      blockstat.totalDataLength+= Block::iounitSize;
+      blockstat.totalUnitCount++;
+      blockstat.validDataLength+= lens[i];
+      if(lens[i] < Block::iounitSize){
+        blockstat.compressUnitCount++;
+      }
+    }
+  }
+  if(validmask.any()){
+    blockstat.validIoUnitCount++;
+  }
 }
 
 void Block::erase() {
@@ -477,24 +497,73 @@ void Block::erase() {
   memset(pNextWritePageIndex, 0, sizeof(uint32_t) * ioUnitInPage);
 
   eraseCount++;
+  blockstat.reset();
 }
 
-void Block::invalidate(uint32_t pageIndex, uint32_t idx) {
-  if (ioUnitInPage == 1) {
-    validBits.at(pageIndex).reset();
-  }
-  else {
-    cvalidBits.at(pageIndex).at(idx).reset();
-  }
-}
+// void Block::invalidate(uint32_t pageIndex, uint16_t idx) {
+//   if (ioUnitInPage == 1) {
+//     validBits.at(pageIndex).reset();
+//   }
+//   else {
+//     cvalidBits.at(pageIndex).at(idx).reset();
+//   }
+// }
 
-void Block::invalidate(uint32_t pageIndex, uint32_t idx, uint8_t c_ind) {
+void Block::invalidate(uint32_t pageIndex, uint16_t idx, uint16_t c_ind, uint32_t len) {
   if (ioUnitInPage == 1) {
+    if(validBits.at(pageIndex).test(c_ind)){
+      //update blockstat
+      updateStatInvalidate(len);
+    }
     validBits.at(pageIndex).reset(c_ind);
   }
   else {
+    if(cvalidBits.at(pageIndex).at(idx).test(c_ind)){
+      //update blockstat
+      updateStatInvalidate(len);
+    }
     cvalidBits.at(pageIndex).at(idx).reset(c_ind);
   }
+  if(!isvalid(pageIndex, idx)){
+    blockstat.validIoUnitCount--;
+  }
+}
+
+void Block::updateStatInvalidate(uint32_t len){
+  blockstat.totalDataLength -= Block::iounitSize;
+  blockstat.totalUnitCount--;
+  blockstat.validDataLength -= len;
+  if(len<Block::iounitSize){
+    blockstat.compressUnitCount--;
+  }
+  // blockstat.validiounit Need isvalid function, so update in invalidate function;
+}
+
+bool Block::isvalid(uint32_t pageIndex, uint16_t idx){
+  if(ioUnitInPage==1){
+    return validBits.at(pageIndex).any();
+  }
+  else{
+    return cvalidBits.at(pageIndex).at(idx).any();
+  }
+}
+
+bool Block::isvalid(uint32_t pageIndex, uint16_t idx, uint16_t c_ind){
+  if(ioUnitInPage == 1){
+    return validBits.at(pageIndex).test(c_ind);
+  }
+  else{
+    return cvalidBits.at(pageIndex).at(idx).test(c_ind); 
+  }
+}
+
+const BlockStat& Block::getBlockStat(){
+  return blockstat;
+}
+
+void Block::setStaticAttr(uint32_t iosize, uint16_t maxclen){
+  Block::iounitSize = iosize;
+  Block::maxCompressedPageCount = maxclen;
 }
 
 }  // namespace FTL

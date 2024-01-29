@@ -38,6 +38,7 @@ typedef struct {
   uint32_t ioUnitInPage;  //!< # smallest I/O unit in one page
   uint32_t pageCountToMaxPerf;  //!< # pages to fully utilize internal parallism
   uint32_t maxCompressUnitInPage;
+  uint32_t ioUnitSize;
 } Parameter;
 
 class FTL : public StatObject {

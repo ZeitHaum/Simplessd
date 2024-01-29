@@ -39,7 +39,13 @@ FTL::FTL(ConfigReader &c, DRAM::AbstractDRAM *d) : conf(c), pDRAM(d) {
   param.pageSize = palparam->superPageSize;
   param.ioUnitInPage = palparam->pageInSuperPage;
   param.pageCountToMaxPerf = palparam->superBlock / palparam->block;
-  param.maxCompressUnitInPage = 8;
+  param.ioUnitSize = param.pageSize / param.ioUnitInPage;
+  if(c.readBoolean(CONFIG_NVME, HIL::NVMe::NVME_USE_COMPRESSED_DISK)){
+    param.maxCompressUnitInPage = 8;
+  }
+  else{
+    param.maxCompressUnitInPage = 1;
+  }
 
   switch (conf.readInt(CONFIG_FTL, FTL_MAPPING_MODE)) {
     case PAGE_MAPPING:

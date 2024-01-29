@@ -387,8 +387,8 @@ void CompressedDisk::init(uint32_t cdsize){
 
 uint16_t CompressedDisk::read(uint64_t slba, uint16_t nlblk, uint8_t *buffer){
   //default Need DeCompress
-  debugprint(LOG_COMMON, "CompressedDiskRead: slba | nlblk ");
-  debugprint(LOG_COMMON, "CompressedDiskRead: %" PRIu64 " | %"  PRIu16 , slba, nlblk);
+  // debugprint(LOG_COMMON, "CompressedDiskRead: slba | nlblk ");
+  // debugprint(LOG_COMMON, "CompressedDiskRead: %" PRIu64 " | %"  PRIu16 , slba, nlblk);
   uint16_t ret = 0;
   //Read 
   if(disk.is_open()){  
@@ -429,7 +429,7 @@ uint16_t CompressedDisk::read(uint64_t slba, uint16_t nlblk, uint8_t *buffer){
     }
     delete[] rd_buffer;
   }
-  debugprint(LOG_COMMON, "CompressedDiskRead: Actual Read Blocks: %" PRIu16, ret);
+  // debugprint(LOG_COMMON, "CompressedDiskRead: Actual Read Blocks: %" PRIu16, ret);
   return ret;
 }
 
@@ -442,25 +442,25 @@ void CompressedDisk::decompressRead(uint64_t idx, uint8_t* buffer){
     uint64_t dest_len = 0;
     compressor->decompress(buffer, src_len, dest_len);
     memcpy(buffer, compressor->buffer, dest_len);
-    debugprint(LOG_COMMON, "DecompressRead In CompressedDisk: idx = %" PRIu64 "src_len = %" PRIu64 "dest_len = %" PRIu64, idx, src_len, dest_len);
+    // debugprint(LOG_COMMON, "DecompressRead In CompressedDisk: idx = %" PRIu64 "src_len = %" PRIu64 "dest_len = %" PRIu64, idx, src_len, dest_len);
   }
 }
 
 uint16_t CompressedDisk::write(uint64_t slba, uint16_t nlblk, uint8_t *buffer){
   //default No Need Compress
-  debugprint(LOG_COMMON, "CompressedDiskWrite: slba | nlblk ");
-  debugprint(LOG_COMMON, "CompressedDiskWrite: %" PRIu64 " | %" PRIu64, slba, nlblk);
+  // debugprint(LOG_COMMON, "CompressedDiskWrite: slba | nlblk ");
+  // debugprint(LOG_COMMON, "CompressedDiskWrite: %" PRIu64 " | %" PRIu64, slba, nlblk);
   uint64_t ret =  Disk::write(slba, nlblk, buffer);
   // I/O write Amplification
   uint64_t now_idx = (slba * sectorSize) / compress_unit_size;
   while(now_idx * compress_unit_size < (slba + nlblk) * sectorSize){
     if(isCompressed(now_idx)){
       compressed_table.erase(now_idx);
-      debugprint(LOG_COMMON, "CompressedDiskWrite: OverRide Erase Compressed Data In %" PRIu64, now_idx);
+      // debugprint(LOG_COMMON, "CompressedDiskWrite: OverRide Erase Compressed Data In %" PRIu64, now_idx);
     }
     ++now_idx;
   }
-  debugprint(LOG_COMMON, "CompressedDiskRead: Actual Write Blocks: %" PRIu16, ret);
+  // debugprint(LOG_COMMON, "CompressedDiskRead: Actual Write Blocks: %" PRIu16, ret);
   return ret;
 }
 
@@ -476,7 +476,7 @@ bool CompressedDisk::compressWrite(uint64_t idx, uint8_t* buffer){
     if(dest_len == src_len) return false;
     compressed_table[idx] = dest_len;
     writeOrdinary(idx * compress_unit_size, compress_unit_size, compressor->buffer);
-    debugprint(LOG_COMMON, "CompressWrite In CompressedDisk: idx = %" PRIu64 " ,src_len = %" PRIu64 " ,dest_len = %" PRIu64, idx, src_len, dest_len);
+    // debugprint(LOG_COMMON, "CompressWrite In CompressedDisk: idx = %" PRIu64 " ,src_len = %" PRIu64 " ,dest_len = %" PRIu64, idx, src_len, dest_len);
   }
   return true;
 }

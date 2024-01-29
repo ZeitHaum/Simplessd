@@ -41,26 +41,64 @@ class PageMapping : public AbstractFTL {
     uint32_t blockIndex;
     uint32_t pageIndex; //may be superpage
     uint16_t iounitIndex; // used in superpage
-    uint16_t compressedunitIndex; // used in compressed
+    uint16_t compressunitIndex; // used in compressed
+    PhysicalAddress():
+      blockIndex(0), pageIndex(0), iounitIndex(0), compressunitIndex(0)
+    {}
+    PhysicalAddress(uint32_t bid, uint32_t pid, uint16_t iid, uint16_t cid):
+      blockIndex(bid), pageIndex(pid), iounitIndex(iid), compressunitIndex(cid)
+    {}
+    std::string toString(){
+      std::string ret = "{";
+      ret += "blockIndex : " + std::to_string(blockIndex) + ", ";
+      ret += "pageIndex : " + std::to_string(pageIndex) + ", ";
+      ret += "iounitIndex :" + std::to_string(iounitIndex) + ", ";
+      ret += "compressunitIndex :" + std::to_string(compressunitIndex) + "}"; 
+      return ret;
+    }
+    void copy(const PhysicalAddress& p){
+      blockIndex = p.blockIndex;
+      pageIndex = p.pageIndex;
+      iounitIndex = p.iounitIndex;
+      compressunitIndex = p.compressunitIndex;
+    }
   };
-  struct CompressInfo{
+  //declare private struct.
+  struct WriteInfo{
+    bool valid;
+    PhysicalAddress toCopyAddr;
+    std::vector<LpnInfo> lpns;
+    std::vector<uint32_t> lens;
+    std::vector<PhysicalAddress> invalidate_addrs;
+    uint32_t validcount;
+    uint64_t beginAt;
+    Bitset validmask;
+    uint8_t maxCompressedPageCount;
+    WriteInfo(uint8_t mcpn):
+      valid(false), validcount(0),
+      maxCompressedPageCount(mcpn)
+    {
+      lpns = std::vector<LpnInfo>(maxCompressedPageCount, {0, 0});
+      lens = std::vector<uint32_t>(maxCompressedPageCount, 0);
+      validmask = Bitset(maxCompressedPageCount);
+    }
+  };
+  struct MapEntry{
+    PhysicalAddress paddr;
     uint64_t is_compressed : 1;
-    uint64_t c_ind : 3;// max 8 page in a physical page
-    uint64_t idx : 8;
-    uint64_t offset : 26;
-    uint64_t length : 26;
-    CompressInfo():
-    is_compressed(0),
-    c_ind(0),
-    idx(0),
-    offset(0),
-    length(0)
+    uint64_t offset : 31;
+    uint64_t length : 31;
+    // unused 1 bit
+    MapEntry():
+      paddr(PhysicalAddress()), is_compressed(0), offset(0), length(0)
+    {}
+    //writeInternal specal adjust
+    MapEntry(uint32_t bid, uint32_t pid, uint16_t iid, uint16_t cid, bool is_c, uint32_t off, uint32_t len):
+      paddr(PhysicalAddress(bid, pid, iid, cid)), is_compressed(is_c), offset(off), length(len)
     {}
     //Change To Uncompressed.
     void reset(){
       is_compressed = 0;
-      c_ind = 0;
-      idx = 0;
       offset = 0;
       length = 0;
     }
@@ -68,8 +106,8 @@ class PageMapping : public AbstractFTL {
   PAL::PAL *pPAL;
 
   ConfigReader &conf;
-  std::unordered_map<uint64_t, std::vector<std::tuple<uint32_t, uint32_t, CompressInfo>>>
-      table;
+  std::unordered_map<uint64_t, std::vector<MapEntry>>
+      table; // FTL 层映射表
   std::unordered_map<uint32_t, Block> blocks;
   std::list<Block> freeBlocks;
   uint32_t nFreeBlocks;  // For some libraries which std::list::size() is O(n)
@@ -87,8 +125,13 @@ class PageMapping : public AbstractFTL {
     uint64_t validSuperPageCopies;
     uint64_t validPageCopies;
     uint64_t erasedTotalBlocks;
-    uint64_t testThirdParty;
+    // new added to observe compress and gc
+    uint64_t decompressCount; // decompressed cout (trigged in pdisk read)
+    uint64_t totalReadIoUnitCount; //total read I/O unit
+    uint64_t overwriteCompressUnitCount; // overwrite compressed unit count (trigged in newly write)
+    uint64_t totalWriteIoUnitCount; // total write I/O unit
   } stat;
+
   CompressedDiskInfo* cd_info;
   uint8_t* compressedBuffer;
 
@@ -106,8 +149,10 @@ class PageMapping : public AbstractFTL {
 
   void readInternal(Request &, uint64_t &);
   void writeInternal(Request &, uint64_t &, bool = true);
+  void writeSubmit(WriteInfo&, PAL::Request&, std::vector<PAL::Request>&);
   void trimInternal(Request &, uint64_t &);
   void eraseInternal(PAL::Request &, uint64_t &);
+  BlockStat calculateBlockStat();
 
  public:
   PageMapping(ConfigReader &, Parameter &, PAL::PAL *, DRAM::AbstractDRAM *);
