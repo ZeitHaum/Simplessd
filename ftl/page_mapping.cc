@@ -265,7 +265,7 @@ void PageMapping::format(LPNRange &range, uint64_t &tick) {
           block->second.invalidate(mapping.paddr.pageIndex, mapping.paddr.iounitIndex, mapping.paddr.compressunitIndex, mapping.length);
         }
         else{
-          block->second.invalidate(mapping.paddr.pageIndex, mapping.paddr.iounitIndex, 0, param.ioUnitSize);
+          block->second.invalidate(mapping.paddr.pageIndex, mapping.paddr.iounitIndex, mapping.paddr.compressunitIndex, param.ioUnitSize);
         }
 
         // Collect block indices
@@ -599,9 +599,13 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                     if(is_comp){
                       // debugprint(LOG_FTL_PAGE_MAPPING, "Compressed Trigged In GC! pageIndex =%" PRIu64 ", idx = %" PRIu64, pageIndex, idx);
                     }
+                    else{
+                      ++stat.failedCompressCout;
+                      debugprint(LOG_FTL_PAGE_MAPPING, "Compressed Trigged Failed! pageIndex =%" PRIu64 ", idx = %" PRIu64 , pageIndex, idx);
+                    }
                   }
                   CompressedLength = pcDisk->getCompressedLength(disk_offset/idxSize);
-                  assert(CompressedLength <= idxSize && "FTLGC Error: compressed Trigged Failed.");
+                  assert(CompressedLength <= idxSize && "panic: compresslength too large");
                 }
                 else {
                   CompressedLength = mapping.length;
@@ -781,7 +785,7 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
             block->second.invalidate(mapping.paddr.pageIndex, mapping.paddr.iounitIndex, mapping.paddr.compressunitIndex, mapping.length);
           }
           else{
-            block->second.invalidate(mapping.paddr.pageIndex, mapping.paddr.iounitIndex, 0, param.ioUnitInPage);
+            block->second.invalidate(mapping.paddr.pageIndex, mapping.paddr.iounitIndex, mapping.paddr.compressunitIndex, param.ioUnitInPage);
           }
         }
       }
@@ -796,7 +800,7 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
     auto ret = table.emplace(
         req.lpn,
         std::vector<MapEntry>(
-            bitsetSize, {(uint32_t)param.totalPhysicalBlocks, (uint32_t)param.pagesInBlock, 0, 0, false, 0, 0}));
+            bitsetSize, {(uint32_t)param.totalPhysicalBlocks, (uint32_t)param.pagesInBlock, 0, 0, false, 0, param.ioUnitInPage}));
     if (!ret.second) {
       panic("Failed to insert new mapping");
     }
@@ -861,7 +865,11 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
       // update mapping to table
       mapping.paddr.blockIndex = block->first;
       mapping.paddr.pageIndex = pageIndex;
-      mapping.reset();
+      mapping.paddr.iounitIndex = idx;
+      mapping.paddr.compressunitIndex = 0;
+      mapping.is_compressed = 0;
+      mapping.length = param.ioUnitSize;
+      mapping.offset = 0;
 
       if (sendToPAL) {
         palRequest.blockIndex = block->first;
@@ -967,7 +975,7 @@ void PageMapping::trimInternal(Request &req, uint64_t &tick) {
         block->second.invalidate(mapping.paddr.pageIndex, mapping.paddr.iounitIndex, mapping.paddr.compressunitIndex, mapping.length);
       }
       else{
-        block->second.invalidate(mapping.paddr.pageIndex, mapping.paddr.iounitIndex, 0, mapping.length);
+        block->second.invalidate(mapping.paddr.pageIndex, mapping.paddr.iounitIndex, mapping.paddr.compressunitIndex, mapping.length);
       }
     }
 
@@ -1141,6 +1149,10 @@ void PageMapping::getStatList(std::vector<Stats> &list, std::string prefix) {
   temp.name = prefix + "page_mapping.compress.totalWriteIoUnitCount";
   temp.desc = "Total Write unit Count";
   list.push_back(temp);
+
+  temp.name = prefix + "page_mapping.compress.failedCompressCout";
+  temp.desc = "Trigged compress but failed count(may be compressed length too large).";
+  list.push_back(temp);
 }
 
 void PageMapping::getStatValues(std::vector<double> &values) {
@@ -1160,6 +1172,7 @@ void PageMapping::getStatValues(std::vector<double> &values) {
   values.push_back(stat.totalReadIoUnitCount);
   values.push_back(stat.overwriteCompressUnitCount);
   values.push_back(stat.totalWriteIoUnitCount);
+  values.push_back(stat.failedCompressCout);
 }
 
 void PageMapping::resetStatValues() {

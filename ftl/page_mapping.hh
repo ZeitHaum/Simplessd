@@ -96,12 +96,6 @@ class PageMapping : public AbstractFTL {
     MapEntry(uint32_t bid, uint32_t pid, uint16_t iid, uint16_t cid, bool is_c, uint32_t off, uint32_t len):
       paddr(PhysicalAddress(bid, pid, iid, cid)), is_compressed(is_c), offset(off), length(len)
     {}
-    //Change To Uncompressed.
-    void reset(){
-      is_compressed = 0;
-      offset = 0;
-      length = 0;
-    }
   };
   PAL::PAL *pPAL;
 
@@ -130,6 +124,7 @@ class PageMapping : public AbstractFTL {
     uint64_t totalReadIoUnitCount; //total read I/O unit
     uint64_t overwriteCompressUnitCount; // overwrite compressed unit count (trigged in newly write)
     uint64_t totalWriteIoUnitCount; // total write I/O unit
+    uint64_t failedCompressCout; // trigged compress but failed count(may be compressed length too large).
   } stat;
 
   CompressedDiskInfo* cd_info;

@@ -473,7 +473,10 @@ bool CompressedDisk::compressWrite(uint64_t idx, uint8_t* buffer){
     uint64_t src_len = compress_unit_size;
     uint64_t dest_len = 0;
     compressor->compress(buffer, src_len, dest_len);
-    if(dest_len == src_len) return false;
+    if(dest_len >= src_len) {
+      debugprint(LOG_COMMON, "Compress Failed,  idx = %" PRIu64 " ,src_len = %" PRIu64 " ,dest_len = %" PRIu64, idx, src_len, dest_len);
+      return false;
+    }
     compressed_table[idx] = dest_len;
     writeOrdinary(idx * compress_unit_size, compress_unit_size, compressor->buffer);
     // debugprint(LOG_COMMON, "CompressWrite In CompressedDisk: idx = %" PRIu64 " ,src_len = %" PRIu64 " ,dest_len = %" PRIu64, idx, src_len, dest_len);
