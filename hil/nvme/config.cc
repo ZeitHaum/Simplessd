@@ -45,7 +45,7 @@ const char NAME_ENABLE_DISK_IMAGE[] = "EnableDiskImage";
 const char NAME_STRICT_DISK_SIZE[] = "StrictSizeCheck";
 const char NAME_DISK_IMAGE_PATH[] = "DiskImageFile";
 const char NAME_USE_COW_DISK[] = "UseCopyOnWriteDisk";
-const char NAME_ENABLE_COMPRESS[] = "EnableCompress";
+const char NAME_COMPRESS_TYPE[] = "CompressType";
 
 Config::Config() {
   pcieGen = PCIExpress::PCIE_3_X;
@@ -65,6 +65,7 @@ Config::Config() {
   strictDiskSize = false;
   useCopyOnWriteDisk = false;
   enableCompress = false;
+  compressType = CompressType::NONE;
 }
 
 bool Config::setConfig(const char *name, const char *value) {
@@ -170,8 +171,23 @@ bool Config::setConfig(const char *name, const char *value) {
     useCopyOnWriteDisk = convertBool(value);
   }
 
-  else if (MATCH_NAME(NAME_ENABLE_COMPRESS)){
-    enableCompress = convertBool(value);
+  else if (MATCH_NAME(NAME_COMPRESS_TYPE)){
+    if(strcmp(value, "NONE") == 0){
+      enableCompress = false;
+      compressType = CompressType::NONE;
+    }
+    else{
+      enableCompress = true;
+      if(strcmp(value, "LZ4") == 0){
+        compressType = CompressType::LZ4;
+      }
+      else if(strcmp(value, "LZMA") == 0){
+        compressType = CompressType::LZMA;
+      }
+      else{
+        panic("Undefined compressed Type!");
+      }
+    }
   }
   else {
     ret = false;
@@ -244,6 +260,8 @@ uint64_t Config::readUint(uint32_t idx) {
     case NVME_LBA_SIZE:
       ret = lbaSize;
       break;
+    case NVME_COMPRESS_TYPE:
+      ret = (uint64_t)compressType;
   }
 
   return ret;
@@ -278,9 +296,8 @@ bool Config::readBoolean(uint32_t idx) {
     case NVME_USE_COW_DISK:
       ret = useCopyOnWriteDisk;
       break;
-    case NVME_USE_COMPRESSED_DISK:
+    case NVME_ENABLE_COMPRESS:
       ret = enableCompress;
-      break;
   }
 
   return ret;

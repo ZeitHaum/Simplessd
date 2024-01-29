@@ -580,7 +580,7 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                 uint64_t idxSize = param.ioUnitSize;
                 uint64_t CompressedLength = idxSize;
                 //Get Compressed Length
-                if(!conf.readBoolean(CONFIG_NVME, HIL::NVMe::NVME_USE_COMPRESSED_DISK)){
+                if(!conf.readBoolean(CONFIG_NVME, HIL::NVMe::NVME_ENABLE_COMPRESS)){
                   //Disable Compress
                   CompressedLength = idxSize;
                 }

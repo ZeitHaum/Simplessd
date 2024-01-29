@@ -85,6 +85,9 @@ class MemDisk : public Disk {
   uint16_t erase(uint64_t, uint16_t) override;
 };
 
+enum class CompressType{
+  NONE, LZ4, LZMA
+};
   
 class CompressedDisk: public Disk{
   private:
@@ -94,7 +97,7 @@ class CompressedDisk: public Disk{
     std::unordered_map<uint64_t, uint64_t> compressed_table;
   public:
     CompressedDisk();
-    void init(uint32_t);
+    void init(uint32_t, CompressType);
     uint64_t getCompressedLength(uint64_t idx);
     void setCompressedLength(uint64_t idx, uint64_t comp_len);
     //只要有任意一段在table中就视为压缩过

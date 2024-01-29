@@ -40,7 +40,7 @@ FTL::FTL(ConfigReader &c, DRAM::AbstractDRAM *d) : conf(c), pDRAM(d) {
   param.ioUnitInPage = palparam->pageInSuperPage;
   param.pageCountToMaxPerf = palparam->superBlock / palparam->block;
   param.ioUnitSize = param.pageSize / param.ioUnitInPage;
-  if(c.readBoolean(CONFIG_NVME, HIL::NVMe::NVME_USE_COMPRESSED_DISK)){
+  if(c.readBoolean(CONFIG_NVME, HIL::NVMe::NVME_ENABLE_COMPRESS)){
     param.maxCompressUnitInPage = 8;
   }
   else{

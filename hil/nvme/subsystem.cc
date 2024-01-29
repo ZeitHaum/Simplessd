@@ -223,11 +223,11 @@ bool Subsystem::createNamespace(uint32_t nsid, Namespace::Information *info) {
   // Create namespace
   Namespace *pNS = new Namespace(this, cfgdata);
   pNS->setData(nsid, info);
-  if(cfgdata.pConfigReader->readBoolean(CONFIG_NVME, NVME_USE_COMPRESSED_DISK)){
+  if(cfgdata.pConfigReader->readBoolean(CONFIG_NVME, NVME_ENABLE_COMPRESS)){
     if(max(logicalPageSize, info->lbaSize) % min(logicalPageSize, info->lbaSize) !=0){
       panic("Error: Unmatched pageSize between subSystem and NameSpace");
     }
-    ((CompressedDisk*)(pNS->getDisk()))->init(logicalPageSize);
+    ((CompressedDisk*)(pNS->getDisk()))->init(logicalPageSize, (CompressType)(cfgdata.pConfigReader->readUint(CONFIG_NVME, NVME_COMPRESS_TYPE)));
   }
   
   lNamespaces.push_back(pNS);

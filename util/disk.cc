@@ -377,9 +377,17 @@ CompressedDisk::~CompressedDisk(){
 }
 
 
-void CompressedDisk::init(uint32_t cdsize){
+void CompressedDisk::init(uint32_t cdsize, CompressType compressType){
   compress_unit_size = cdsize;
-  compressor = new LZ4Compressor(compress_unit_size);
+  if(compressType == CompressType::LZ4){
+    compressor = new LZ4Compressor(compress_unit_size);
+  }
+  else if(compressType == CompressType::LZMA){
+    compressor = new LzmaCompressor(compress_unit_size);
+  }
+  else{
+    panic("Undefine CompressType!");
+  }
   this->compress_unit_totalcnt = diskSize / compress_unit_size  + 1;
   compressed_table.reserve(this->compress_unit_totalcnt);
   debugprint(LOG_COMMON, "CompressedDiskInit: compress_unit_size = %" PRIu32 ", compress_unit_totalcnt = %" PRIu32, compress_unit_size, compress_unit_totalcnt);

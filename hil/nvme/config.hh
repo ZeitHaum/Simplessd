@@ -26,6 +26,7 @@
 
 #include "sim/base_config.hh"
 #include "util/interface.hh"
+#include "util/disk.hh"
 
 namespace SimpleSSD {
 
@@ -51,7 +52,8 @@ typedef enum {
   NVME_STRICT_DISK_SIZE,
   NVME_DISK_IMAGE_PATH,
   NVME_USE_COW_DISK,
-  NVME_USE_COMPRESSED_DISK
+  NVME_ENABLE_COMPRESS,
+  NVME_COMPRESS_TYPE
 } NVME_CONFIG;
 
 class Config : public BaseConfig {
@@ -73,6 +75,7 @@ class Config : public BaseConfig {
   bool strictDiskSize;           //!< Default: False
   bool useCopyOnWriteDisk;       //!< Default: False
   bool enableCompress;           //!< Default: False
+  CompressType compressType;     //!< Default: CompressType::None
   std::unordered_map<uint16_t, std::string> diskImagePaths;  //!< Default: ""
 
  public:

@@ -115,7 +115,7 @@ void Namespace::setData(uint32_t id, Information *data) {
     std::string filename =
         conf.readString(CONFIG_NVME, NVME_DISK_IMAGE_PATH + nsid);
 
-    if (conf.readBoolean(CONFIG_NVME, NVME_USE_COMPRESSED_DISK)){
+    if (conf.readBoolean(CONFIG_NVME, NVME_ENABLE_COMPRESS)){
       pDisk = new CompressedDisk();
     }
     else if (filename.length() == 0) {

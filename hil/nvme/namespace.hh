@@ -26,7 +26,6 @@
 #include "hil/nvme/dma.hh"
 #include "hil/nvme/queue.hh"
 #include "util/def.hh"
-#include "util/disk.hh"
 #include "util/simplessd.hh"
 
 namespace SimpleSSD {
