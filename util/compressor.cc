@@ -1,9 +1,9 @@
 //Compressor, author: ZeitHaum.
 #include "util/compressor.hh"
+
 extern "C"{
     #include "lib/lz4/lib/lz4.c"
 }
-#include "string.h"
 
 Compressor::Compressor()
 {
@@ -57,5 +57,91 @@ void LZ4Compressor::decompress(uint8_t* src, uint64_t src_len, uint64_t& dest_le
     int max_decompresslen = getMaxDecompressLen();
     this->ajustBuffer(max_decompresslen);
     dest_len = LZ4_decompress_safe((char*)src, (char*) this->buffer, (int)src_len, max_decompresslen);
-    assert(dest_len <= max_decompresslen);
+    assert(dest_len <= (uint64_t)max_decompresslen);
 }
+
+LzmaCompressor::LzmaCompressor()
+:Compressor()
+{
+	init();
+}
+
+LzmaCompressor::LzmaCompressor(uint64_t buffer_size)
+:Compressor(buffer_size * 4) // lzma compress_size may be larger than input
+{
+	init();
+}
+
+void LzmaCompressor::init(){
+	// prepare space for the encoded properties
+	propsSize = 5;
+	propsEncoded = new uint8_t[propsSize];
+	LzmaEncProps_Init(&props);
+	props.fb = 40;
+}
+
+void LzmaCompressor::compress(uint8_t* src, uint64_t src_len, uint64_t& dest_len){
+	const SizeT off = propsSize + 8; // propsSize + decompressSize(8 bytes)
+	// set up properties
+	if (src_len >= (1 << 20))
+		props.dictSize = 1 << 20; // 1mb dictionary
+	else
+		props.dictSize = src_len; // smaller dictionary = faster!
+
+	uint64_t outputSize64 = buffer_size;
+
+	int lzmaStatus = LzmaEncode(
+		buffer + off, &outputSize64, src, src_len,
+		&props, propsEncoded, &propsSize, 0,
+		NULL,
+		&_allocFuncs, &_allocFuncs);
+
+	dest_len = outputSize64 + off;
+	if (lzmaStatus == SZ_OK) {
+		// tricky: we have to generate the LZMA header
+		// propsSize bytes properties + 8 byte uncompressed size
+		memcpy(buffer, propsEncoded, propsSize);
+		for (int i = 0; i < 8; i++)
+			buffer[propsSize + i] = (src_len >> (i * 8)) & 0xFF;
+	}
+	else{
+		assert(0);
+	}
+}
+
+void LzmaCompressor::decompress(uint8_t* src, uint64_t src_len, uint64_t& dest_len){
+	const SizeT off = propsSize + 8;
+	assert(src_len >= off &&"invalid lzma header!");
+	UInt64 size = 0;
+	for (int i = 0; i < 8; i++)
+		size |= (src[propsSize + i] << (i * 8));
+	if (size <= (256 * 1024 * 1024)) {
+		ELzmaStatus lzmaStatus;
+		SizeT procOutSize = size, procInSize = src_len - off;
+		int status = LzmaDecode(buffer, &procOutSize, src + off, &procInSize, src, propsSize, LZMA_FINISH_END, &lzmaStatus, &_allocFuncs);
+
+		if (status == SZ_OK && procOutSize == size) {
+			dest_len = size;
+		}
+		else{
+			assert(0);
+		}
+	}
+	else{
+		assert(0);
+	}
+}
+
+void* LzmaCompressor::_lzmaAlloc(ISzAllocPtr, size_t size){
+    return new uint8_t[size];
+}
+
+void LzmaCompressor::_lzmaFree(ISzAllocPtr, void *addr){
+    if (!addr)
+		return;
+	delete[] reinterpret_cast<uint8_t *>(addr);
+}
+
+ISzAlloc LzmaCompressor::_allocFuncs = {
+	LzmaCompressor::_lzmaAlloc, LzmaCompressor::_lzmaFree
+};

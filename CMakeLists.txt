@@ -49,6 +49,7 @@ Check you initialized submodules.")
 endif ()
 
 # Add subproject
+add_definitions(-D_7ZIP_ST)  # for static build lzma
 add_subdirectory(${PROJECT_SOURCE_DIR}/lib/mcpat)
 add_subdirectory(${PROJECT_SOURCE_DIR}/lib/lz4/build/cmake)
 
@@ -58,7 +59,8 @@ include_directories(
   ${PROJECT_SOURCE_DIR}/lib/mcpat
   ${PROJECT_SOURCE_DIR}/lib/mcpat/cacti
   ${PROJECT_SOURCE_DIR}/lib/inih
-  ${PROJECT_SOURCE_DIR}/lib/lz4/lib
+  ${PROJECT_SOURCE_DIR}/lib/lz4/
+  ${PROJECT_SOURCE_DIR}/lib/7z/C/
   ${DRAMPOWER_SOURCE_DIR}
 )
 
@@ -169,6 +171,10 @@ set(SRC_UTIL
   util/interface.cc
   util/simplessd.cc
   util/compressor.cc
+  lib/7z/C/LzFind.c
+  lib/7z/C/LzmaDec.c
+  lib/7z/C/LzmaEnc.c
+  lib/7z/C/CpuArch.c
 )
 
 # Source group for MSVC
