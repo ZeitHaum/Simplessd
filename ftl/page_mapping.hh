@@ -68,7 +68,8 @@ class PageMapping : public AbstractFTL {
     bool valid;
     PhysicalAddress toCopyAddr;
     std::vector<LpnInfo> lpns;
-    std::vector<uint32_t> lens;
+    std::vector<uint32_t> old_lens; // this vector store the old lens to invalidate, not the new lens!
+    std::vector<uint32_t> new_lens; // this vector store the new lens to write
     std::vector<PhysicalAddress> invalidate_addrs;
     uint32_t validcount;
     uint64_t beginAt;
@@ -79,7 +80,8 @@ class PageMapping : public AbstractFTL {
       maxCompressedPageCount(mcpn)
     {
       lpns = std::vector<LpnInfo>(maxCompressedPageCount, {0, 0});
-      lens = std::vector<uint32_t>(maxCompressedPageCount, 0);
+      old_lens = std::vector<uint32_t>(maxCompressedPageCount, 0);
+      new_lens = std::vector<uint32_t>(maxCompressedPageCount, 0);
       validmask = Bitset(maxCompressedPageCount);
     }
   };

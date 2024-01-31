@@ -564,9 +564,9 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
         uint32_t nowPageIdx = 0;
         uint32_t nowOffset = 0;
 
+        bool is_filled = true;
         for (uint16_t idx = 0; idx < bitsetSize; idx++) {
           if (iomap.test(idx)) {
-            bool is_filled = true;
             for(uint16_t cIdx = 0; cIdx < param.maxCompressUnitInPage; cIdx++){
               if(bits[idx].test(cIdx)){
                 LpnInfo& lpn_info = lpns.at(idx).at(cIdx);
@@ -625,22 +625,33 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                   w_info.toCopyAddr.blockIndex = freeBlock->second.getBlockIndex();
                   w_info.toCopyAddr.pageIndex = nowPageIdx;
                   w_info.toCopyAddr.iounitIndex = idx;
+                  //check toCopyAddr valid
+                  if(w_info.toCopyAddr.blockIndex >= param.totalPhysicalBlocks || w_info.toCopyAddr.pageIndex >= param.pagesInBlock || w_info.toCopyAddr.iounitIndex >= param.ioUnitInPage) {
+                    panic("TocopyAddress overflow!");
+                  }
                   w_info.validmask.reset();
                   w_info.beginAt = beginAt;
                 }
                 mapping.paddr.copy(w_info.toCopyAddr);
                 mapping.paddr.compressunitIndex = nowPageCnt++;
                 nowOffset += CompressedLength;
+                //w_info.lens should update carefully
+                if(!mapping.is_compressed){
+                  w_info.old_lens[w_info.validcount] = param.ioUnitSize;
+                }
+                else{
+                  w_info.old_lens[w_info.validcount] = mapping.length;
+                }
                 mapping.is_compressed = (CompressedLength < idxSize);
                 assert(CompressedLength <= idxSize);
                 mapping.offset = nowOffset;
                 mapping.length = CompressedLength;
                 block->second.getLPNs(pageIndex, t_lpn, t_bst,idx);
-                assert((t_lpn.size() == param.maxCompressUnitInPage && t_bst.test(0)));
                 w_info.validmask.set(w_info.validcount);
-                w_info.lens.at(w_info.validcount) = mapping.length;
-                w_info.lpns.at(w_info.validcount++) = t_lpn[0];
+                w_info.new_lens.at(w_info.validcount) = mapping.length;
+                w_info.lpns.at(w_info.validcount) = t_lpn[0];
                 w_info.invalidate_addrs.push_back({(uint32_t)(iter), pageIndex, idx, cIdx});
+                w_info.validcount++;
               }  
             }
             stat.validPageCopies++;//Invalid
@@ -702,10 +713,10 @@ void PageMapping::readInternal(Request &req, uint64_t &tick) {
 
   if (mappingList != table.end()) {
     if (bRandomTweak) {
-      pDRAM->read(&(*mappingList), 12 * req.ioFlag.count(), tick);
+      pDRAM->read(&(*mappingList), sizeof(MapEntry) * req.ioFlag.count(), tick);
     }
     else {
-      pDRAM->read(&(*mappingList), 12, tick);
+      pDRAM->read(&(*mappingList), sizeof(MapEntry), tick);
     }
 
     for (uint32_t idx = 0; idx < bitsetSize; idx++) {
@@ -817,12 +828,12 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
 
   if (sendToPAL) {
     if (bRandomTweak) {
-      pDRAM->read(&(*mappingList), 12 * req.ioFlag.count(), tick);
-      pDRAM->write(&(*mappingList), 12 * req.ioFlag.count(), tick);
+      pDRAM->read(&(*mappingList), sizeof(MapEntry) * req.ioFlag.count(), tick);
+      pDRAM->write(&(*mappingList), sizeof(MapEntry) * req.ioFlag.count(), tick);
     }
     else {
-      pDRAM->read(&(*mappingList), 12, tick);
-      pDRAM->write(&(*mappingList), 12, tick);
+      pDRAM->read(&(*mappingList), sizeof(MapEntry), tick);
+      pDRAM->write(&(*mappingList), sizeof(MapEntry), tick);
     }
   }
 
@@ -906,7 +917,7 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
     }
 
     std::vector<uint32_t> list;
-    uint64_t beginAt = tick;
+      uint64_t beginAt = tick;
 
     selectVictimBlock(list, beginAt);
 
@@ -930,9 +941,9 @@ void PageMapping::writeSubmit(WriteInfo& w_info, PAL::Request& req, std::vector<
   std::unordered_map<uint32_t, Block>::iterator freeBlock = blocks.find(w_info.toCopyAddr.blockIndex);
   for(uint32_t i = 0; i<w_info.invalidate_addrs.size(); ++i){
     auto indv_block = blocks.find(w_info.invalidate_addrs[i].blockIndex);
-    indv_block->second.invalidate(w_info.invalidate_addrs[i].pageIndex, w_info.invalidate_addrs[i].iounitIndex, w_info.invalidate_addrs[i].compressunitIndex, w_info.lens[i]);
-  }
-  freeBlock->second.write(w_info.toCopyAddr.pageIndex, w_info.lpns, w_info.lens, w_info.validmask,  w_info.toCopyAddr.iounitIndex, w_info.beginAt);
+    indv_block->second.invalidate(w_info.invalidate_addrs[i].pageIndex, w_info.invalidate_addrs[i].iounitIndex, w_info.invalidate_addrs[i].compressunitIndex, w_info.old_lens[i]);
+  } 
+  freeBlock->second.write(w_info.toCopyAddr.pageIndex, w_info.lpns, w_info.new_lens, w_info.validmask,  w_info.toCopyAddr.iounitIndex, w_info.beginAt);
   req.blockIndex = freeBlock->first;
   req.pageIndex = w_info.toCopyAddr.pageIndex;
 
@@ -956,10 +967,10 @@ void PageMapping::trimInternal(Request &req, uint64_t &tick) {
 
   if (mappingList != table.end()) {
     if (bRandomTweak) {
-      pDRAM->read(&(*mappingList), 12 * req.ioFlag.count(), tick);
+      pDRAM->read(&(*mappingList), sizeof(MapEntry) * req.ioFlag.count(), tick);
     }
     else {
-      pDRAM->read(&(*mappingList), 12, tick);
+      pDRAM->read(&(*mappingList), sizeof(MapEntry), tick);
     }
 
     // Do trim
