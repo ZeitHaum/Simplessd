@@ -474,6 +474,7 @@ void Block::updateStatWrite(std::vector<uint32_t>&lens, Bitset& validmask){
   if(validmask.any()){
     blockstat.validIoUnitCount++;
   }
+  checkstat();
 }
 
 void Block::erase() {
@@ -527,6 +528,7 @@ void Block::invalidate(uint32_t pageIndex, uint16_t idx, uint16_t c_ind, uint32_
   if(!isvalid(pageIndex, idx)){
     blockstat.validIoUnitCount--;
   }
+  checkstat();
 }
 
 void Block::updateStatInvalidate(uint32_t len){
@@ -564,6 +566,28 @@ const BlockStat& Block::getBlockStat(){
 void Block::setStaticAttr(uint32_t iosize, uint16_t maxclen){
   Block::iounitSize = iosize;
   Block::maxCompressedPageCount = maxclen;
+}
+
+void Block::checkstat(){
+  //check block stats
+  if(blockstat.totalDataLength % Block::iounitSize !=0){
+    panic("Check failed in blockstat.totalDataLength.");
+  }
+  else if(blockstat.validDataLength > blockstat.totalDataLength || blockstat.validDataLength > ioUnitInPage * pageCount * Block::iounitSize){
+    panic("Check failed in blockstat.validDataLength.");
+  }
+  else if(blockstat.totalUnitCount != blockstat.totalDataLength / Block::iounitSize){
+    panic("Check failed in blockstat.totalUnitCount.");
+  }
+  else if(blockstat.compressUnitCount > blockstat.totalUnitCount){
+    panic("Check failed in blockstat.compressUnitCount.");
+  }
+  else if(blockstat.validIoUnitCount > blockstat.totalUnitCount || blockstat.validIoUnitCount > ioUnitInPage * pageCount){
+    panic("Check failed in blockstat.validIoUnitCount.");
+  }
+  else if((blockstat.totalDataLength - blockstat.validDataLength) * (blockstat.compressUnitCount) < (blockstat.totalUnitCount - blockstat.validIoUnitCount) * (blockstat.compressUnitCount * Block::iounitSize)){
+    panic("Check failed in r_f, r_f is negtive.");
+  }
 }
 
 }  // namespace FTL

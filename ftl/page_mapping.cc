@@ -634,7 +634,6 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                 }
                 mapping.paddr.copy(w_info.toCopyAddr);
                 mapping.paddr.compressunitIndex = nowPageCnt++;
-                nowOffset += CompressedLength;
                 //w_info.lens should update carefully
                 if(!mapping.is_compressed){
                   w_info.old_lens[w_info.validcount] = param.ioUnitSize;
@@ -645,6 +644,7 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                 mapping.is_compressed = (CompressedLength < idxSize);
                 assert(CompressedLength <= idxSize);
                 mapping.offset = nowOffset;
+                nowOffset += CompressedLength;
                 mapping.length = CompressedLength;
                 block->second.getLPNs(pageIndex, t_lpn, t_bst,idx);
                 w_info.validmask.set(w_info.validcount);
@@ -796,7 +796,7 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
             block->second.invalidate(mapping.paddr.pageIndex, mapping.paddr.iounitIndex, mapping.paddr.compressunitIndex, mapping.length);
           }
           else{
-            block->second.invalidate(mapping.paddr.pageIndex, mapping.paddr.iounitIndex, mapping.paddr.compressunitIndex, param.ioUnitInPage);
+            block->second.invalidate(mapping.paddr.pageIndex, mapping.paddr.iounitIndex, mapping.paddr.compressunitIndex, param.ioUnitSize);
           }
         }
       }
@@ -986,7 +986,7 @@ void PageMapping::trimInternal(Request &req, uint64_t &tick) {
         block->second.invalidate(mapping.paddr.pageIndex, mapping.paddr.iounitIndex, mapping.paddr.compressunitIndex, mapping.length);
       }
       else{
-        block->second.invalidate(mapping.paddr.pageIndex, mapping.paddr.iounitIndex, mapping.paddr.compressunitIndex, mapping.length);
+        block->second.invalidate(mapping.paddr.pageIndex, mapping.paddr.iounitIndex, mapping.paddr.compressunitIndex, param.ioUnitSize);
       }
     }
 

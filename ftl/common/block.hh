@@ -153,6 +153,7 @@ class Block {
   void invalidate(uint32_t, uint16_t, uint16_t, uint32_t);
   void updateStatInvalidate(uint32_t len);
   const BlockStat& getBlockStat(); //getter
+  void checkstat();
 };
 
 }  // namespace FTL
