@@ -591,7 +591,7 @@ void Block::checkstat(){
   else if(blockstat.validIoUnitCount > blockstat.totalUnitCount || blockstat.validIoUnitCount > ioUnitInPage * pageCount){
     panic("Check failed in blockstat.validIoUnitCount.");
   }
-  else if((blockstat.totalDataLength - blockstat.validDataLength) * (blockstat.compressUnitCount) < (blockstat.totalUnitCount - blockstat.validIoUnitCount) * (blockstat.compressUnitCount * Block::iounitSize)){
+  else if((blockstat.totalDataLength - blockstat.validDataLength) < iounitSize * (blockstat.totalUnitCount - blockstat.validIoUnitCount)){
     panic("Check failed in r_f, r_f is negtive.");
   }
 }
