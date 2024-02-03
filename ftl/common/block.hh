@@ -43,6 +43,10 @@ struct BlockStat{
   
   BlockStat() = default;
 
+  BlockStat(uint32_t lt, uint32_t lv, uint32_t uv, uint32_t uc, uint32_t ut)
+    :totalDataLength(lt), validDataLength(lv), validIoUnitCount(uv), compressUnitCount(uc), totalUnitCount(ut)
+  {}
+
   BlockStat(const BlockStat& other) = default;
 
   BlockStat(BlockStat&& other) noexcept
@@ -88,6 +92,16 @@ struct BlockStat{
     compressUnitCount += other.compressUnitCount;
     totalUnitCount += other.totalUnitCount;
     return *this;
+  }
+
+  bool operator==(const BlockStat& other) const{
+    bool ret = true;
+    ret &= (totalDataLength == other.totalDataLength);
+    ret &= (validDataLength == other.validDataLength);
+    ret &= (validIoUnitCount == other.validIoUnitCount);
+    ret &= (compressUnitCount == other.compressUnitCount);
+    ret &= (totalUnitCount == other.totalUnitCount);
+    return ret;
   }
 
 };

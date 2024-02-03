@@ -377,9 +377,15 @@ LpnInfo Block::getLPN(uint32_t pageIndex, uint16_t idx, uint16_t comp_ind){
   assert(comp_ind < maxCompressedPageCount);
   assert(idx < ioUnitInPage);
   if(ioUnitInPage == 1){
+    if(!validBits[pageIndex].test(comp_ind)){
+      panic("Try to read invalid information.");
+    }
     return ppLPNs[pageIndex][comp_ind];
   }
   else{
+    if(!cvalidBits[pageIndex][idx].test(comp_ind)){
+      panic("Try to read invalid information.");
+    }
     return pppLPNs[pageIndex][idx][comp_ind];
   }
 }

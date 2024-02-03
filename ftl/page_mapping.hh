@@ -120,7 +120,6 @@ class PageMapping : public AbstractFTL {
     uint64_t reclaimedBlocks;
     uint64_t validSuperPageCopies;
     uint64_t validPageCopies;
-    uint64_t erasedTotalBlocks;
     // new added to observe compress and gc
     uint64_t decompressCount; // decompressed cout (trigged in pdisk read)
     uint64_t totalReadIoUnitCount; //total read I/O unit
@@ -149,7 +148,7 @@ class PageMapping : public AbstractFTL {
   void writeSubmit(WriteInfo&, PAL::Request&, std::vector<PAL::Request>&);
   void trimInternal(Request &, uint64_t &);
   void eraseInternal(PAL::Request &, uint64_t &);
-  BlockStat calculateBlockStat();
+  BlockStat calculateBlockStat();  
 
  public:
   PageMapping(ConfigReader &, Parameter &, PAL::PAL *, DRAM::AbstractDRAM *);

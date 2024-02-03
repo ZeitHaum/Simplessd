@@ -513,8 +513,8 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
   std::vector<PAL::Request> eraseRequests;
   std::vector<std::vector<LpnInfo>> lpns(param.ioUnitInPage, vector<LpnInfo>(param.maxCompressUnitInPage));
   std::vector<Bitset> bits(param.ioUnitInPage, Bitset(param.maxCompressUnitInPage));
-  std::vector<LpnInfo> t_lpn(param.maxCompressUnitInPage, {0, 0}); // used for temp get lpnInfo.
-  Bitset t_bst(param.maxCompressUnitInPage);// used for temp get lpnvalidBits.
+  // std::vector<LpnInfo> t_lpn(param.maxCompressUnitInPage, {0, 0}); // used for temp get lpnInfo.
+  // Bitset t_bst(param.maxCompressUnitInPage);// used for temp get lpnvalidBits.
   Bitset iomap(param.ioUnitInPage);
   uint64_t beginAt;
   uint64_t readFinishedAt = tick;
@@ -591,20 +591,25 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                   CompressedDisk* pcDisk = ((CompressedDisk*)(cd_info->pDisk));
                   if(cd_info->pDisk){
                     CompressedLength = pcDisk->getCompressedLength(disk_offset/idxSize);
-                  }
-                  if(CompressedLength == idxSize){
-                    //Need Compress
-                    pcDisk -> readOrdinary(disk_offset, disk_length, compressedBuffer);
-                    bool is_comp = pcDisk -> compressWrite(disk_offset / idxSize, compressedBuffer);
-                    if(is_comp){
-                      // debugprint(LOG_FTL_PAGE_MAPPING, "Compressed Trigged In GC! pageIndex =%" PRIu64 ", idx = %" PRIu64, pageIndex, idx);
+                    if(CompressedLength == idxSize){
+                      //Need Compress
+                      pcDisk -> readOrdinary(disk_offset, disk_length, compressedBuffer);
+                      bool is_comp = pcDisk -> compressWrite(disk_offset / idxSize, compressedBuffer);
+                      if(is_comp){
+                        // debugprint(LOG_FTL_PAGE_MAPPING, "Compressed Trigged In GC! pageIndex =%" PRIu64 ", idx = %" PRIu64, pageIndex, idx);
+                      }
+                      else{
+                        ++stat.failedCompressCout;
+                        debugprint(LOG_FTL_PAGE_MAPPING, "Compressed Trigged Failed! pageIndex =%" PRIu64 ", idx = %" PRIu64 , pageIndex, idx);
+                      }
                     }
-                    else{
-                      ++stat.failedCompressCout;
-                      debugprint(LOG_FTL_PAGE_MAPPING, "Compressed Trigged Failed! pageIndex =%" PRIu64 ", idx = %" PRIu64 , pageIndex, idx);
-                    }
+                    CompressedLength = pcDisk->getCompressedLength(disk_offset/idxSize);
                   }
-                  CompressedLength = pcDisk->getCompressedLength(disk_offset/idxSize);
+                  else{
+                    //The disk is invalid.
+                    warn("Compress is enabled but no valid disk, GC is considered as not enabled.");
+                    CompressedLength = param.ioUnitSize;
+                  }
                   assert(CompressedLength <= idxSize && "panic: compresslength too large");
                 }
                 else {
@@ -646,10 +651,9 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                 mapping.offset = nowOffset;
                 nowOffset += CompressedLength;
                 mapping.length = CompressedLength;
-                block->second.getLPNs(pageIndex, t_lpn, t_bst,idx);
                 w_info.validmask.set(w_info.validcount);
                 w_info.new_lens.at(w_info.validcount) = mapping.length;
-                w_info.lpns.at(w_info.validcount) = t_lpn[0];
+                w_info.lpns.at(w_info.validcount) = block->second.getLPN(pageIndex, idx, cIdx);
                 w_info.invalidate_addrs.push_back({(uint32_t)(iter), pageIndex, idx, cIdx});
                 w_info.validcount++;
               }  
@@ -817,6 +821,7 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
     }
 
     mappingList = ret.first;
+    stat.totalWriteIoUnitCount+= req.ioFlag.count();
   }
 
   // Write data to free block
@@ -1015,8 +1020,7 @@ void PageMapping::eraseInternal(PAL::Request &req, uint64_t &tick) {
   block->second.erase();
 
   pPAL->erase(req, tick);
-  ++stat.erasedTotalBlocks;
-
+  
   // Check erase count
   uint32_t erasedCount = block->second.getEraseCount();
 
@@ -1121,10 +1125,6 @@ void PageMapping::getStatList(std::vector<Stats> &list, std::string prefix) {
   list.push_back(temp);
 
   //Add by ZeitHaum
-  temp.name = prefix + "page_mapping.gc.erasedTotalBlocks";
-  temp.desc = "Total erased blocks during GC";
-  list.push_back(temp);
-
   temp.name = prefix + "page_mapping.compress.totalDataLength";
   temp.desc = "Total valid data length (before compress)";
   list.push_back(temp);
@@ -1172,7 +1172,6 @@ void PageMapping::getStatValues(std::vector<double> &values) {
   values.push_back(stat.validSuperPageCopies);
   values.push_back(stat.validPageCopies);
   values.push_back(calculateWearLeveling());
-  values.push_back(stat.erasedTotalBlocks);
   BlockStat blockstat = calculateBlockStat();
   values.push_back(blockstat.totalDataLength);
   values.push_back(blockstat.validDataLength);
