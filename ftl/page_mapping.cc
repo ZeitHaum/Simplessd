@@ -362,6 +362,7 @@ uint32_t PageMapping::getFreeBlock(uint32_t idx) {
 }
 
 uint32_t PageMapping::getLastFreeBlock(Bitset &iomap) {
+  // update lastFreeBlockIndex in corresponding pos.
   if (!bRandomTweak || (lastFreeBlockIOMap & iomap).any()) {
     // Update lastFreeBlockIndex
     lastFreeBlockIndex++;
@@ -369,11 +370,11 @@ uint32_t PageMapping::getLastFreeBlock(Bitset &iomap) {
     if (lastFreeBlockIndex == param.pageCountToMaxPerf) {
       lastFreeBlockIndex = 0;
     }
-
-    lastFreeBlockIOMap = iomap;
+    lastFreeBlockIOMap.reset();
+    // lastFreeBlockIOMap = iomap;
   }
   else {
-    lastFreeBlockIOMap |= iomap;
+    // lastFreeBlockIOMap |= iomap;
   }
 
   auto freeBlock = blocks.find(lastFreeBlock.at(lastFreeBlockIndex));
@@ -545,12 +546,19 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
         }
 
         //Generate iomap
+        iomap.reset();
         for(uint32_t i = 0; i< param.ioUnitInPage; ++i){
-          iomap.set(i, bits[i].any());
+          if(bits[i].any()){
+            iomap.set(i);
+          }
+          else{
+            iomap.reset(i);
+          }
         }
 
         // Retrive free block
         auto freeBlock = blocks.find(getLastFreeBlock(iomap));
+        //notice: the update lastFreeIoMap
 
         // Issue Read
         req.blockIndex = block->first;
@@ -560,8 +568,6 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
         readRequests.push_back(req);
 
         // Update mapping table
-        uint32_t nowPageCnt = 0;
-        uint32_t nowPageIdx = 0;
         uint32_t nowOffset = 0;
 
         bool is_filled = true;
@@ -622,13 +628,11 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                   if(w_info.valid) {
                     writeSubmit(w_info, req, writeRequests);
                   }
-                  nowPageIdx = freeBlock->second.getNextWritePageIndex(idx);
-                  nowPageCnt = 0;
                   nowOffset = 0;
                   is_filled = false;
                   w_info.valid = true;
                   w_info.toCopyAddr.blockIndex = freeBlock->second.getBlockIndex();
-                  w_info.toCopyAddr.pageIndex = nowPageIdx;
+                  w_info.toCopyAddr.pageIndex = freeBlock->second.getNextWritePageIndex(idx);
                   w_info.toCopyAddr.iounitIndex = idx;
                   //check toCopyAddr valid
                   if(w_info.toCopyAddr.blockIndex >= param.totalPhysicalBlocks || w_info.toCopyAddr.pageIndex >= param.pagesInBlock || w_info.toCopyAddr.iounitIndex >= param.ioUnitInPage) {
@@ -638,7 +642,7 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                   w_info.beginAt = beginAt;
                 }
                 mapping.paddr.copy(w_info.toCopyAddr);
-                mapping.paddr.compressunitIndex = nowPageCnt++;
+                mapping.paddr.compressunitIndex = w_info.validcount;
                 //w_info.lens should update carefully
                 if(!mapping.is_compressed){
                   w_info.old_lens[w_info.validcount] = param.ioUnitSize;
@@ -826,6 +830,7 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
 
   // Write data to free block
   block = blocks.find(getLastFreeBlock(req.ioFlag));
+  lastFreeBlockIOMap |= req.ioFlag;
 
   if (block == blocks.end()) {
     panic("No such block");
@@ -943,6 +948,8 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
 void PageMapping::writeSubmit(WriteInfo& w_info, PAL::Request& req, std::vector<PAL::Request>& writeRequests){
   // Block
   assert(w_info.valid);
+  assert(!lastFreeBlockIOMap.test(w_info.toCopyAddr.iounitIndex));
+  lastFreeBlockIOMap.set(w_info.toCopyAddr.iounitIndex);
   std::unordered_map<uint32_t, Block>::iterator freeBlock = blocks.find(w_info.toCopyAddr.blockIndex);
   for(uint32_t i = 0; i<w_info.invalidate_addrs.size(); ++i){
     auto indv_block = blocks.find(w_info.invalidate_addrs[i].blockIndex);
