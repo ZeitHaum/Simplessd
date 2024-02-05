@@ -633,7 +633,7 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                   w_info.valid = true;
                   w_info.toCopyAddr.blockIndex = freeBlock->second.getBlockIndex();
                   w_info.toCopyAddr.pageIndex = freeBlock->second.getNextWritePageIndex(idx);
-                  w_info.toCopyAddr.iounitIndex = idx;
+                  w_info.toCopyAddr.iounitIndex = idx;  
                   //check toCopyAddr valid
                   if(w_info.toCopyAddr.blockIndex >= param.totalPhysicalBlocks || w_info.toCopyAddr.pageIndex >= param.pagesInBlock || w_info.toCopyAddr.iounitIndex >= param.ioUnitInPage) {
                     panic("TocopyAddress overflow!");
