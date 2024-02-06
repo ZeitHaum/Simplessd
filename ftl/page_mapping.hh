@@ -39,51 +39,29 @@ class PageMapping : public AbstractFTL {
  private:
   struct PhysicalAddress{
     uint32_t blockIndex;
-    uint32_t pageIndex; //may be superpage
-    uint16_t iounitIndex; // used in superpage
+    uint32_t pageIndex; //may be 
+    //default ioUnitIndex is the same between lpn and ppn.
     uint16_t compressunitIndex; // used in compressed
-    PhysicalAddress():
-      blockIndex(0), pageIndex(0), iounitIndex(0), compressunitIndex(0)
-    {}
-    PhysicalAddress(uint32_t bid, uint32_t pid, uint16_t iid, uint16_t cid):
-      blockIndex(bid), pageIndex(pid), iounitIndex(iid), compressunitIndex(cid)
-    {}
-    std::string toString(){
-      std::string ret = "{";
-      ret += "blockIndex : " + std::to_string(blockIndex) + ", ";
-      ret += "pageIndex : " + std::to_string(pageIndex) + ", ";
-      ret += "iounitIndex :" + std::to_string(iounitIndex) + ", ";
-      ret += "compressunitIndex :" + std::to_string(compressunitIndex) + "}"; 
-      return ret;
-    }
-    void copy(const PhysicalAddress& p){
-      blockIndex = p.blockIndex;
-      pageIndex = p.pageIndex;
-      iounitIndex = p.iounitIndex;
-      compressunitIndex = p.compressunitIndex;
-    }
+    PhysicalAddress();
+    PhysicalAddress(uint32_t bid, uint32_t pid, uint16_t cid);
+    std::string toString();
+    void copy(const PhysicalAddress& p);
   };
   //declare private struct.
-  struct WriteInfo{
-    bool valid;
-    PhysicalAddress toCopyAddr;
-    std::vector<LpnInfo> lpns;
-    std::vector<uint32_t> old_lens; // this vector store the old lens to invalidate, not the new lens!
-    std::vector<uint32_t> new_lens; // this vector store the new lens to write
-    std::vector<PhysicalAddress> invalidate_addrs;
-    uint32_t validcount;
-    uint64_t beginAt;
-    Bitset validmask;
-    uint8_t maxCompressedPageCount;
-    WriteInfo(uint8_t mcpn):
-      valid(false), validcount(0),
-      maxCompressedPageCount(mcpn)
-    {
-      lpns = std::vector<LpnInfo>(maxCompressedPageCount, {0, 0});
-      old_lens = std::vector<uint32_t>(maxCompressedPageCount, 0);
-      new_lens = std::vector<uint32_t>(maxCompressedPageCount, 0);
-      validmask = Bitset(maxCompressedPageCount);
-    }
+  struct CopyRequest{
+    // bool valid;
+    // PhysicalAddress toCopyAddr;
+    // lpn[i][j]表示第i个ioUnit压缩后的lpn
+    std::vector<std::vector<uint64_t>> lpns;
+    std::vector<std::vector<uint32_t>> new_lens; // this vector store the new lens to write
+    std::vector<uint32_t> lens;// calculate the total lens of copy data.
+    std::vector<uint16_t> counts;// calculate the counts of every ioUnit
+    Parameter* param;
+    CopyRequest(Parameter* p);
+    void clear();
+    void addUnit(uint64_t lpn, uint64_t new_len, uint32_t idx);
+    void merge(CopyRequest& copy_req);
+    bool empty();
   };
   struct MapEntry{
     PhysicalAddress paddr;
@@ -95,8 +73,8 @@ class PageMapping : public AbstractFTL {
       paddr(PhysicalAddress()), is_compressed(0), offset(0), length(0)
     {}
     //writeInternal specal adjust
-    MapEntry(uint32_t bid, uint32_t pid, uint16_t iid, uint16_t cid, bool is_c, uint32_t off, uint32_t len):
-      paddr(PhysicalAddress(bid, pid, iid, cid)), is_compressed(is_c), offset(off), length(len)
+    MapEntry(uint32_t bid, uint32_t pid, uint16_t cid, bool is_c, uint32_t off, uint32_t len):
+      paddr(PhysicalAddress(bid, pid, cid)), is_compressed(is_c), offset(off), length(len)
     {}
   };
   PAL::PAL *pPAL;
@@ -109,6 +87,7 @@ class PageMapping : public AbstractFTL {
   uint32_t nFreeBlocks;  // For some libraries which std::list::size() is O(n)
   std::vector<uint32_t> lastFreeBlock;
   Bitset lastFreeBlockIOMap;
+  CopyRequest nowCopyReq;
   uint32_t lastFreeBlockIndex;
 
   bool bReclaimMore;
@@ -134,10 +113,12 @@ class PageMapping : public AbstractFTL {
   float freeBlockRatio();
   uint32_t convertBlockIdx(uint32_t);
   uint32_t getFreeBlock(uint32_t);
-  uint32_t getLastFreeBlock(Bitset &);
+  bool isAvailable(const CopyRequest& copy_req);
+  uint32_t getLastFreeBlock(Bitset&);
   void calculateVictimWeight(std::vector<std::pair<uint32_t, float>> &,
                              const EVICT_POLICY, uint64_t);
   void selectVictimBlock(std::vector<uint32_t> &, uint64_t &);
+  uint64_t getCompressedLengthFromDisk(uint64_t, uint32_t,const MapEntry&);
   void doGarbageCollection(std::vector<uint32_t> &, uint64_t &);  
 
   float calculateWearLeveling();
@@ -145,7 +126,7 @@ class PageMapping : public AbstractFTL {
 
   void readInternal(Request &, uint64_t &);
   void writeInternal(Request &, uint64_t &, bool = true);
-  void writeSubmit(WriteInfo&, PAL::Request&, std::vector<PAL::Request>&);
+  void copySubmit(PAL::Request&, std::vector<PAL::Request>&, Bitset&,  uint64_t);
   void trimInternal(Request &, uint64_t &);
   void eraseInternal(PAL::Request &, uint64_t &);
   BlockStat calculateBlockStat();  

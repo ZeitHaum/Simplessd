@@ -29,11 +29,6 @@ namespace SimpleSSD {
 
 namespace FTL {
 
-struct LpnInfo{
-  uint64_t lpn;
-  uint32_t idx;
-}; 
-
 struct BlockStat{
   uint64_t totalDataLength;
   uint64_t validDataLength;
@@ -117,18 +112,18 @@ class Block {
 
   //Unused
   Bitset *pValidBits;
-  LpnInfo *pLPNs;
+  uint64_t *pLPNs;
   // Following variables are used when ioUnitInPage == 1
   Bitset *pErasedBits;
   std::vector<Bitset> validBits;
-  LpnInfo **ppLPNs; 
+  uint64_t **ppLPNs; 
 
   // Following variables are used when ioUnitInPage > 1
   std::vector<Bitset> erasedBits;
   // ppLPNs[i][j]表示第i个物理页第j个压缩块的LPN.
   std::vector<std::vector<Bitset>> cvalidBits;
   // pppLPNs[i][j][k]表示第i个物理页第j个ioUnit第k个压缩块的LPN.
-  LpnInfo ***pppLPNs;
+  uint64_t ***pppLPNs;
 
   uint64_t lastAccessed;
   uint32_t eraseCount;
@@ -152,13 +147,13 @@ class Block {
   uint32_t getDirtyPageCount();
   uint32_t getNextWritePageIndex();
   uint32_t getNextWritePageIndex(uint32_t);
-  bool getPageInfo(uint32_t, std::vector<std::vector<LpnInfo>> &, std::vector<Bitset> &);
-  void getLPNs(uint32_t, std::vector<LpnInfo>&, Bitset& bits, uint32_t);
-  LpnInfo getLPN(uint32_t, uint16_t, uint16_t);
+  bool getPageInfo(uint32_t, std::vector<std::vector<uint64_t>> &, std::vector<Bitset> &);
+  void getLPNs(uint32_t, std::vector<uint64_t>&, Bitset& bits, uint32_t);
+  uint64_t getLPN(uint32_t, uint16_t, uint16_t);
   bool read(uint32_t, uint32_t, uint64_t);
   // bool write(uint32_t, uint64_t, uint32_t, uint64_t);
-  bool write(uint32_t, std::vector<LpnInfo>&, std::vector<uint32_t>&,  Bitset& , uint32_t, uint64_t);
-  void updateStatWrite(std::vector<uint32_t>&lens, Bitset& validmask);
+  bool write(uint32_t, std::vector<uint64_t>&, std::vector<uint32_t>&, uint32_t, uint64_t);
+  void updateStatWrite(std::vector<uint32_t>& );
   static void setStaticAttr(uint32_t , uint16_t);
   void erase();
   bool isvalid(uint32_t, uint16_t);

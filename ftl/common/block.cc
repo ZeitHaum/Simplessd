@@ -52,9 +52,9 @@ Block::Block(uint32_t blockIdx, uint32_t count, uint32_t ioUnit)
     Bitset copy(maxCompressedPageCount);
     validBits = std::vector<Bitset>(pageCount, copy);
 
-    ppLPNs = (LpnInfo **)calloc(pageCount, sizeof(LpnInfo*));
+    ppLPNs = (uint64_t **)calloc(pageCount, sizeof(uint64_t*));
     for(uint32_t i = 0; i<pageCount; i++){
-      ppLPNs[i] = (LpnInfo* ) calloc(maxCompressedPageCount, sizeof(LpnInfo *));
+      ppLPNs[i] = (uint64_t* ) calloc(maxCompressedPageCount, sizeof(uint64_t *));
     }
   }
   else if (ioUnitInPage > 1) {
@@ -64,12 +64,12 @@ Block::Block(uint32_t blockIdx, uint32_t count, uint32_t ioUnit)
     Bitset validcopy(maxCompressedPageCount);
     cvalidBits = std::vector<std::vector<Bitset>>(pageCount, std::vector<Bitset>(ioUnitInPage, validcopy));
 
-    pppLPNs = (LpnInfo ***)calloc(pageCount, sizeof(LpnInfo **));
+    pppLPNs = (uint64_t ***)calloc(pageCount, sizeof(uint64_t **));
 
     for (uint32_t i = 0; i < pageCount; i++) {
-      pppLPNs[i] = (LpnInfo **)calloc(ioUnitInPage, sizeof(LpnInfo*));
+      pppLPNs[i] = (uint64_t **)calloc(ioUnitInPage, sizeof(uint64_t*));
       for(uint32_t j = 0; j < ioUnitInPage; j++){
-        pppLPNs[i][j] = (LpnInfo *) calloc(maxCompressedPageCount, sizeof(LpnInfo));
+        pppLPNs[i][j] = (uint64_t *) calloc(maxCompressedPageCount, sizeof(uint64_t));
       }
     }
   }
@@ -321,7 +321,7 @@ uint32_t Block::getNextWritePageIndex(uint32_t idx) {
   return pNextWritePageIndex[idx];
 }
 
-bool Block::getPageInfo(uint32_t pageIndex, std::vector<std::vector<LpnInfo>> &lpns,
+bool Block::getPageInfo(uint32_t pageIndex, std::vector<std::vector<uint64_t>> &lpns,
                         std::vector<Bitset> &bits) {
   //Check Size
   assert(lpns.size() == ioUnitInPage);
@@ -356,7 +356,7 @@ bool Block::getPageInfo(uint32_t pageIndex, std::vector<std::vector<LpnInfo>> &l
 }
 
 
-void Block::getLPNs(uint32_t pageIndex, std::vector<LpnInfo>&lpn, Bitset& bits, uint32_t idx){
+void Block::getLPNs(uint32_t pageIndex, std::vector<uint64_t>&lpn, Bitset& bits, uint32_t idx){
   assert(lpn.size() == maxCompressedPageCount);
   if(ioUnitInPage == 1){
     bits.copy(validBits.at(pageIndex));
@@ -373,7 +373,7 @@ void Block::getLPNs(uint32_t pageIndex, std::vector<LpnInfo>&lpn, Bitset& bits, 
   }
 }
 
-LpnInfo Block::getLPN(uint32_t pageIndex, uint16_t idx, uint16_t comp_ind){
+uint64_t Block::getLPN(uint32_t pageIndex, uint16_t idx, uint16_t comp_ind){
   assert(comp_ind < maxCompressedPageCount);
   assert(idx < ioUnitInPage);
   if(ioUnitInPage == 1){
@@ -410,14 +410,10 @@ bool Block::read(uint32_t pageIndex, uint32_t idx, uint64_t tick) {
   return read;
 }
 
-bool Block::write(uint32_t pageIndex, std::vector<LpnInfo>&lpns, std::vector<uint32_t>&lens, Bitset& validmask,uint32_t idx, 
+bool Block::write(uint32_t pageIndex, std::vector<uint64_t>&lpns, std::vector<uint32_t>&lens, uint32_t idx, 
                   uint64_t tick) {
   bool write = false;
 
-  if(validmask.size() != maxCompressedPageCount || lpns.size() != maxCompressedPageCount){
-    panic("I/O LPN size mismatch maxCompressedPageCout");
-  }
-  
   if (ioUnitInPage == 1 && idx == 0) {
     write = pErasedBits->test(pageIndex);
   }
@@ -440,23 +436,23 @@ bool Block::write(uint32_t pageIndex, std::vector<LpnInfo>&lpns, std::vector<uin
         panic("Idx greater than IoUnitInPage");
       }
       pErasedBits->reset(pageIndex);
-      validBits[pageIndex].copy(validmask);
 
       for(uint32_t i = 0; i<lpns.size(); ++i){
+        validBits[pageIndex].set(i);
         ppLPNs[pageIndex][i] = lpns[i];
       }
     }
     else {
       erasedBits.at(pageIndex).reset(idx);
-      cvalidBits[pageIndex][idx].copy(validmask);
       for(uint32_t i = 0; i<lpns.size(); ++i){
+        cvalidBits[pageIndex][idx].set(i);
         pppLPNs[pageIndex][idx][i] = lpns[i];
       }
     }
 
     pNextWritePageIndex[idx] = pageIndex + 1;
     //update blockstat
-    updateStatWrite(lens, validmask);
+    updateStatWrite(lens);
   }
   else {
     panic("Write to non erased page");
@@ -465,19 +461,17 @@ bool Block::write(uint32_t pageIndex, std::vector<LpnInfo>&lpns, std::vector<uin
   return write;
 }
 
-void Block::updateStatWrite(std::vector<uint32_t>&lens, Bitset& validmask){
-  for(uint16_t i = 0; i<maxCompressedPageCount; ++i){
-    if(validmask.test(i)){
-      //update blockstat
-      blockstat.totalDataLength+= Block::iounitSize;
-      blockstat.totalUnitCount++;
-      blockstat.validDataLength+= lens[i];
-      if(lens[i] < Block::iounitSize){
-        blockstat.compressUnitCount++;
-      }
+void Block::updateStatWrite(std::vector<uint32_t>&lens){
+  for(uint16_t i = 0; i<lens.size(); ++i){
+    //update blockstat
+    blockstat.totalDataLength+= Block::iounitSize;
+    blockstat.totalUnitCount++;
+    blockstat.validDataLength+= lens[i];
+    if(lens[i] < Block::iounitSize){
+      blockstat.compressUnitCount++;
     }
   }
-  if(validmask.any()){
+  if(!lens.empty()){
     blockstat.validIoUnitCount++;
   }
   checkstat();
