@@ -48,18 +48,24 @@ class PageMapping : public AbstractFTL {
     void copy(const PhysicalAddress& p);
   };
   //declare private struct.
+  struct CopyInfo{
+    uint64_t lpn;
+    uint32_t new_len;// new write len;
+    uint32_t old_len;// old write len;
+    PhysicalAddress invalidate_addr;
+    uint8_t* changed_data = nullptr;
+    uint64_t disk_idx = 0;
+    CopyInfo();
+    CopyInfo(uint64_t, uint32_t, uint32_t, PhysicalAddress);
+  };
   struct CopyRequest{
-    // bool valid;
-    // PhysicalAddress toCopyAddr;
-    // lpn[i][j]表示第i个ioUnit压缩后的lpn
-    std::vector<std::vector<uint64_t>> lpns;
-    std::vector<std::vector<uint32_t>> new_lens; // this vector store the new lens to write
+    std::vector<std::vector<CopyInfo>> copy_infos;
     std::vector<uint32_t> lens;// calculate the total lens of copy data.
     std::vector<uint16_t> counts;// calculate the counts of every ioUnit
     Parameter* param;
     CopyRequest(Parameter* p);
     void clear();
-    void addUnit(uint64_t lpn, uint64_t new_len, uint32_t idx);
+    void addCopyInfo(CopyInfo copy_info,  uint32_t idx);
     void merge(CopyRequest& copy_req);
     bool empty();
   };
@@ -118,7 +124,7 @@ class PageMapping : public AbstractFTL {
   void calculateVictimWeight(std::vector<std::pair<uint32_t, float>> &,
                              const EVICT_POLICY, uint64_t);
   void selectVictimBlock(std::vector<uint32_t> &, uint64_t &);
-  uint64_t getCompressedLengthFromDisk(uint64_t, uint32_t,const MapEntry&);
+  void getCompressedLengthFromDisk(uint64_t, uint32_t,const MapEntry&, CopyInfo&);
   void doGarbageCollection(std::vector<uint32_t> &, uint64_t &);  
 
   float calculateWearLeveling();

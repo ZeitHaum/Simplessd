@@ -492,6 +492,26 @@ bool CompressedDisk::compressWrite(uint64_t idx, uint8_t* buffer){
   return true;
 }
 
+/**
+ * 将write_data压缩后压缩长度赋值为dest_len, 压缩数据写入buffer.
+*/
+bool CompressedDisk::compressBufferWrite(uint64_t idx, uint64_t& dest_len, uint8_t* write_data, uint8_t* buffer){
+  if(isCompressed(idx)){
+    panic("Error: Already Compressed");
+  }
+  else{
+    uint64_t src_len = compress_unit_size;
+    dest_len = 0;
+    compressor->compress(write_data, src_len, dest_len);
+    if(dest_len >= src_len) {
+      debugprint(LOG_COMMON, "Compress Failed,  idx = %" PRIu64 " ,src_len = %" PRIu64 " ,dest_len = %" PRIu64, idx, src_len, dest_len);
+      return false;
+    }
+    memcpy(buffer, compressor->buffer, dest_len);
+  }
+  return true;
+}
+
 uint16_t CompressedDisk::erase(uint64_t, uint16_t nlblk) {
   return nlblk;
 }

@@ -108,6 +108,7 @@ class CompressedDisk: public Disk{
     virtual uint16_t write(uint64_t, uint16_t, uint8_t *);
     virtual uint16_t erase(uint64_t, uint16_t);
     bool compressWrite(uint64_t idx, uint8_t* );
+    bool compressBufferWrite(uint64_t idx, uint64_t& comp_len, uint8_t* write_data, uint8_t* buffer);
     void decompressRead(uint64_t idx, uint8_t* );
 };
 }  // namespace SimpleSSD

@@ -98,7 +98,6 @@ struct BlockStat{
     ret &= (totalUnitCount == other.totalUnitCount);
     return ret;
   }
-
 };
 
 class Block {
