@@ -5,6 +5,7 @@ extern "C"{
     #include "lib/lz4/lib/lz4.c"
 }
 
+namespace SimpleSSD{
 Compressor::Compressor()
 {
     //default size 512KB
@@ -144,4 +145,5 @@ void LzmaCompressor::_lzmaFree(ISzAllocPtr, void *addr){
 
 ISzAlloc LzmaCompressor::_allocFuncs = {
 	LzmaCompressor::_lzmaAlloc, LzmaCompressor::_lzmaFree
+};
 };

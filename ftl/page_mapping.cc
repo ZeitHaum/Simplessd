@@ -601,6 +601,9 @@ void PageMapping::getCompressedLengthFromDisk(uint64_t lpn, uint32_t idx, const 
     //Disable Compress
     CompressedLength = param.ioUnitSize;
   }
+  else if(mapping.is_actual == 0x0){
+    CompressedLength = param.ioUnitSize;
+  }
   else if(mapping.is_compressed == 0x0){
     //Not Compressed, Need Compress.
     uint64_t disk_offset = (lpn * param.ioUnitInPage + idx) * param.ioUnitSize - cd_info->offset;
@@ -932,6 +935,7 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
       mapping.offset = 0;
 
       if (sendToPAL) {
+        mapping.is_actual = 1;
         palRequest.blockIndex = block->first;
         palRequest.pageIndex = pageIndex;
 
@@ -944,6 +948,9 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
         }
 
         pPAL->write(palRequest, beginAt);
+      }
+      else{
+        mapping.is_actual = 0;
       }
 
       finishedAt = MAX(finishedAt, beginAt);

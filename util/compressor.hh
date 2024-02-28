@@ -13,6 +13,7 @@ extern "C"{
     #include "lib/7z/C/LzmaDec.h"
 }
 
+namespace SimpleSSD{
 class Compressor{
 public:
     uint8_t* buffer;
@@ -51,5 +52,6 @@ private:
     static void *_lzmaAlloc(ISzAllocPtr, size_t size);
     static void _lzmaFree(ISzAllocPtr, void *addr);
     static ISzAlloc _allocFuncs;
+};
 };
 #endif

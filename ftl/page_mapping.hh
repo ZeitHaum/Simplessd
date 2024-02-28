@@ -72,15 +72,15 @@ class PageMapping : public AbstractFTL {
   struct MapEntry{
     PhysicalAddress paddr;
     uint64_t is_compressed : 1;
+    uint64_t is_actual : 1;// Check for whether has actual data, used for calculate compress ratio, default is true;
     uint64_t offset : 31;
     uint64_t length : 31;
-    // unused 1 bit
     MapEntry():
-      paddr(PhysicalAddress()), is_compressed(0), offset(0), length(0)
+      paddr(PhysicalAddress()), is_compressed(0), is_actual(1),offset(0), length(0)
     {}
     //writeInternal specal adjust
     MapEntry(uint32_t bid, uint32_t pid, uint16_t cid, bool is_c, uint32_t off, uint32_t len):
-      paddr(PhysicalAddress(bid, pid, cid)), is_compressed(is_c), offset(off), length(len)
+      paddr(PhysicalAddress(bid, pid, cid)), is_compressed(is_c), is_actual(1),offset(off), length(len)
     {}
   };
   PAL::PAL *pPAL;
