@@ -29,6 +29,7 @@
 #include "ftl/ftl.hh"
 #include "pal/pal.hh"
 #include "util/disk.hh"
+#include "time.h"
 
 
 namespace SimpleSSD {
@@ -111,6 +112,9 @@ class PageMapping : public AbstractFTL {
     uint64_t overwriteCompressUnitCount; // overwrite compressed unit count (trigged in newly write)
     uint64_t totalWriteIoUnitCount; // total write I/O unit
     uint64_t failedCompressCout; // trigged compress but failed count(may be compressed length too large).
+    // new added to observe latency model
+    uint64_t gcIoLatency;
+    clock_t gcClockCycles;
   } stat;
 
   CompressedDiskInfo* cd_info;

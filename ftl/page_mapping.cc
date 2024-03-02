@@ -646,6 +646,8 @@ void PageMapping::getCompressedLengthFromDisk(uint64_t lpn, uint32_t idx, const 
 
 void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                                       uint64_t &tick) {
+  clock_t begin = clock();
+  uint64_t cp_tick = tick;
   PAL::Request req(param.ioUnitInPage);
   std::vector<PAL::Request> readRequests;
   std::vector<PAL::Request> writeRequests;
@@ -756,6 +758,8 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
   }
 
   tick = MAX(writeFinishedAt, eraseFinishedAt);
+  stat.gcClockCycles += clock() - begin;
+  stat.gcIoLatency += tick - cp_tick;
   tick += applyLatency(CPU::FTL__PAGE_MAPPING, CPU::DO_GARBAGE_COLLECTION);
 }
 
@@ -1253,6 +1257,14 @@ void PageMapping::getStatList(std::vector<Stats> &list, std::string prefix) {
   temp.name = prefix + "page_mapping.compress.failedCompressCout";
   temp.desc = "Trigged compress but failed count(may be compressed length too large).";
   list.push_back(temp);
+
+  temp.name = prefix + "page_mapping.latency.gcIoLatency";
+  temp.desc = "Measuring the I/O latency of GC";
+  list.push_back(temp);
+
+  temp.name = prefix + "page_mapping.latency.gcClockCycles";
+  temp.desc = "Use clock() function to measure the actual cpu clocks of gc";
+  list.push_back(temp);
 }
 
 void PageMapping::getStatValues(std::vector<double> &values) {
@@ -1272,6 +1284,8 @@ void PageMapping::getStatValues(std::vector<double> &values) {
   values.push_back(stat.overwriteCompressUnitCount);
   values.push_back(stat.totalWriteIoUnitCount);
   values.push_back(stat.failedCompressCout);
+  values.push_back(stat.gcIoLatency);
+  values.push_back(stat.gcClockCycles);
 }
 
 void PageMapping::resetStatValues() {
