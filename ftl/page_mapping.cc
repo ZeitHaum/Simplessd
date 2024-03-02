@@ -503,7 +503,7 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
   uint64_t readFinishedAt = tick;
   uint64_t writeFinishedAt = tick;
   uint64_t eraseFinishedAt = tick;
-  uint64_t begin_c = __builtin_ia32_rdtsc();
+  uint64_t begin_c = clock();
 
   if (blocksToReclaim.size() == 0) {
     return;
@@ -589,7 +589,7 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
 
     eraseRequests.push_back(req);
   }
-  uint64_t used_cycle = __builtin_ia32_rdtsc() - begin_c;
+  uint64_t used_cycle = clock() - begin_c;
   stat.gcCycles += used_cycle;
 
   // Do actual I/O here
