@@ -493,6 +493,7 @@ void PageMapping::selectVictimBlock(std::vector<uint32_t> &list,
 void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                                       uint64_t &tick) {
   uint64_t cp_tick = tick;
+  uint64_t begin_c = clock();
   PAL::Request req(param.ioUnitInPage);
   std::vector<PAL::Request> readRequests;
   std::vector<PAL::Request> writeRequests;
@@ -503,7 +504,6 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
   uint64_t readFinishedAt = tick;
   uint64_t writeFinishedAt = tick;
   uint64_t eraseFinishedAt = tick;
-  uint64_t begin_c = clock();
 
   if (blocksToReclaim.size() == 0) {
     return;
@@ -589,8 +589,6 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
 
     eraseRequests.push_back(req);
   }
-  uint64_t used_cycle = clock() - begin_c;
-  stat.gcCycles += used_cycle;
 
   // Do actual I/O here
   // This handles PAL2 limitation (SIGSEGV, infinite loop, or so-on)
@@ -617,7 +615,8 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
 
     eraseFinishedAt = MAX(eraseFinishedAt, beginAt);
   }
-
+  uint64_t used_cycle = clock() - begin_c;
+  stat.gcCycles += used_cycle;
   tick = MAX(writeFinishedAt, eraseFinishedAt);
   uint64_t io_lat = tick - cp_tick;
   uint64_t lat = applyLatency(CPU::FTL__PAGE_MAPPING, CPU::DO_GARBAGE_COLLECTION);
