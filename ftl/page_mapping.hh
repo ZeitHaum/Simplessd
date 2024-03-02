@@ -57,6 +57,7 @@ class PageMapping : public AbstractFTL {
     uint64_t reclaimedBlocks;
     uint64_t validSuperPageCopies;
     uint64_t validPageCopies;
+    uint64_t gcCycles;
   } stat;
 
   float freeBlockRatio();

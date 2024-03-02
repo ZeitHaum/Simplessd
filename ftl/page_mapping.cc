@@ -492,6 +492,7 @@ void PageMapping::selectVictimBlock(std::vector<uint32_t> &list,
 
 void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                                       uint64_t &tick) {
+  uint64_t cp_tick = tick;
   PAL::Request req(param.ioUnitInPage);
   std::vector<PAL::Request> readRequests;
   std::vector<PAL::Request> writeRequests;
@@ -502,6 +503,7 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
   uint64_t readFinishedAt = tick;
   uint64_t writeFinishedAt = tick;
   uint64_t eraseFinishedAt = tick;
+  uint64_t begin_c = __builtin_ia32_rdtsc();
 
   if (blocksToReclaim.size() == 0) {
     return;
@@ -587,6 +589,8 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
 
     eraseRequests.push_back(req);
   }
+  uint64_t used_cycle = __builtin_ia32_rdtsc() - begin_c;
+  stat.gcCycles += used_cycle;
 
   // Do actual I/O here
   // This handles PAL2 limitation (SIGSEGV, infinite loop, or so-on)
@@ -615,7 +619,10 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
   }
 
   tick = MAX(writeFinishedAt, eraseFinishedAt);
-  tick += applyLatency(CPU::FTL__PAGE_MAPPING, CPU::DO_GARBAGE_COLLECTION);
+  uint64_t io_lat = tick - cp_tick;
+  uint64_t lat = applyLatency(CPU::FTL__PAGE_MAPPING, CPU::DO_GARBAGE_COLLECTION);
+  uint64_t actual_lat = used_cycle * 1250;
+  tick += lat + (io_lat - io_lat + actual_lat);
 }
 
 void PageMapping::readInternal(Request &req, uint64_t &tick) {
@@ -962,6 +969,10 @@ void PageMapping::getStatList(std::vector<Stats> &list, std::string prefix) {
   temp.name = prefix + "page_mapping.wear_leveling";
   temp.desc = "Wear-leveling factor";
   list.push_back(temp);
+
+  temp.name = prefix + "page_mapping.gcCycles";
+  temp.desc = "Calculate gc cycles";
+  list.push_back(temp);
 }
 
 void PageMapping::getStatValues(std::vector<double> &values) {
@@ -970,6 +981,7 @@ void PageMapping::getStatValues(std::vector<double> &values) {
   values.push_back(stat.validSuperPageCopies);
   values.push_back(stat.validPageCopies);
   values.push_back(calculateWearLeveling());
+  values.push_back(stat.gcCycles);
 }
 
 void PageMapping::resetStatValues() {
