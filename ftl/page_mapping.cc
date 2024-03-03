@@ -493,7 +493,8 @@ void PageMapping::selectVictimBlock(std::vector<uint32_t> &list,
 void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                                       uint64_t &tick) {
   uint64_t cp_tick = tick;
-  uint64_t begin_c = clock();
+  uint64_t begin_tsc = __builtin_ia32_rdtsc();
+  uint64_t begin_clk = clock();
   PAL::Request req(param.ioUnitInPage);
   std::vector<PAL::Request> readRequests;
   std::vector<PAL::Request> writeRequests;
@@ -549,6 +550,7 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
               panic("Invalid mapping table entry");
             }
 
+            
             pDRAM->read(&(*mappingList), 8 * param.ioUnitInPage, tick);
 
             auto &mapping = mappingList->second.at(idx);
@@ -560,7 +562,7 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
 
             freeBlock->second.write(newPageIdx, lpns.at(idx), idx, beginAt);
 
-            // Issue Write
+            // Issue Write 
             req.blockIndex = newBlockIdx;
             req.pageIndex = newPageIdx;
 
@@ -590,6 +592,9 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
     eraseRequests.push_back(req);
   }
 
+  uint64_t used_cycle_tsc = __builtin_ia32_rdtsc() - begin_tsc;
+  stat.gcCycles += used_cycle_tsc;
+  uint64_t used_cycle_clk = clock() - begin_clk;
   // Do actual I/O here
   // This handles PAL2 limitation (SIGSEGV, infinite loop, or so-on)
   for (auto &iter : readRequests) {
@@ -615,13 +620,12 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
 
     eraseFinishedAt = MAX(eraseFinishedAt, beginAt);
   }
-  uint64_t used_cycle = clock() - begin_c;
-  stat.gcCycles += used_cycle;
   tick = MAX(writeFinishedAt, eraseFinishedAt);
   uint64_t io_lat = tick - cp_tick;
   uint64_t lat = applyLatency(CPU::FTL__PAGE_MAPPING, CPU::DO_GARBAGE_COLLECTION);
-  uint64_t actual_lat = used_cycle * 1250;
-  tick += lat + (io_lat - io_lat + actual_lat);
+  uint64_t actual_lat_clk = used_cycle_clk * 1250 * 3792;
+  uint64_t actual_lat_tsc = used_cycle_tsc * 1250;
+  tick += lat + (io_lat - io_lat + actual_lat_clk - actual_lat_tsc);
 }
 
 void PageMapping::readInternal(Request &req, uint64_t &tick) {
