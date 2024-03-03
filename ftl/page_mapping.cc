@@ -594,7 +594,7 @@ void PageMapping::selectVictimBlock(std::vector<uint32_t> &list,
   tick += applyLatency(CPU::FTL__PAGE_MAPPING, CPU::SELECT_VICTIM_BLOCK);
 }
 
-void PageMapping::getCompressedLengthFromDisk(uint64_t lpn, uint32_t idx, const MapEntry& mapping, CopyInfo& copy_info){
+void PageMapping::getCompressedLengthFromDisk(uint64_t lpn, uint32_t idx, const MapEntry& mapping, CopyInfo& copy_info, uint64_t& tick){
   //Get Compressed Length
   uint64_t CompressedLength = 0;
   if(!conf.readBoolean(CONFIG_NVME, HIL::NVMe::NVME_ENABLE_COMPRESS)){
@@ -642,12 +642,11 @@ void PageMapping::getCompressedLengthFromDisk(uint64_t lpn, uint32_t idx, const 
   }
   assert(CompressedLength > 0);
   copy_info.new_len = CompressedLength;
+  tick += applyLatency(CPU::FTL__PAGE_MAPPING, CPU::GET_COMPRESSED_LENGTH_FROM_DISK);
 }
 
 void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                                       uint64_t &tick) {
-  clock_t begin = clock();
-  uint64_t cp_tick = tick;
   PAL::Request req(param.ioUnitInPage);
   std::vector<PAL::Request> readRequests;
   std::vector<PAL::Request> writeRequests;
@@ -695,7 +694,7 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
               pDRAM->read(&(*mappingList), (sizeof(MapEntry)) * param.ioUnitInPage, tick);
               MapEntry& mapping = mappingList->second.at(idx);
               CopyInfo copy_info = {lpn, 0, (uint32_t)mapping.length, mapping.paddr};
-              getCompressedLengthFromDisk(lpn, idx, mapping, copy_info);
+              getCompressedLengthFromDisk(lpn, idx, mapping, copy_info, tick);
               //Store information into CopyRequest.
               copy_req.addCopyInfo(copy_info, idx);
             }
@@ -758,8 +757,6 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
   }
 
   tick = MAX(writeFinishedAt, eraseFinishedAt);
-  stat.gcClockCycles += clock() - begin;
-  stat.gcIoLatency += tick - cp_tick;
   tick += applyLatency(CPU::FTL__PAGE_MAPPING, CPU::DO_GARBAGE_COLLECTION);
 }
 
@@ -995,7 +992,7 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
   }
 }
 
-void PageMapping::copySubmit(PAL::Request& req, std::vector<PAL::Request>& writeRequests, Bitset& iomap, uint64_t tick){
+void PageMapping::copySubmit(PAL::Request& req, std::vector<PAL::Request>& writeRequests, Bitset& iomap, uint64_t& tick){
   //Generate iomap
   iomap.reset();
   for(uint32_t idx = 0; idx < param.ioUnitInPage; ++idx){
@@ -1057,7 +1054,7 @@ void PageMapping::copySubmit(PAL::Request& req, std::vector<PAL::Request>& write
     }
   }
   nowCopyReq.clear();
-
+  tick +=  tick += applyLatency(CPU::FTL__PAGE_MAPPING, CPU::COPY_SUBMIT);
 }
 
 void PageMapping::trimInternal(Request &req, uint64_t &tick) {
@@ -1258,14 +1255,6 @@ void PageMapping::getStatList(std::vector<Stats> &list, std::string prefix) {
   temp.desc = "Trigged compress but failed count(may be compressed length too large).";
   list.push_back(temp);
 
-  temp.name = prefix + "page_mapping.latency.gcIoLatency";
-  temp.desc = "Measuring the I/O latency of GC";
-  list.push_back(temp);
-
-  temp.name = prefix + "page_mapping.latency.gcClockCycles";
-  temp.desc = "Use clock() function to measure the actual cpu clocks of gc";
-  list.push_back(temp);
-
   temp.name = prefix + "page_mapping.compDisk.compressCount";
   temp.desc = "Compress trigged count(include compressWrite and compressBufferWrite).";
   list.push_back(temp);
@@ -1300,8 +1289,6 @@ void PageMapping::getStatValues(std::vector<double> &values) {
   values.push_back(stat.overwriteCompressUnitCount);
   values.push_back(stat.totalWriteIoUnitCount);
   values.push_back(stat.failedCompressCout);
-  values.push_back(stat.gcIoLatency);
-  values.push_back(stat.gcClockCycles);
   CompressedDisk::CompressDiskStats* diskStats = getCompDiskStat();
   if(diskStats){
     values.push_back(diskStats->compressCount);

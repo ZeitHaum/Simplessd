@@ -144,158 +144,174 @@ CPU::CPU(ConfigReader &c) : conf(c), lastResetStat(0) {
   ftlCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_FTL));
 
   // Initialize CPU table
-  cpi.insert({FTL, std::unordered_map<uint16_t, InstStat>()});
-  cpi.insert({FTL__PAGE_MAPPING, std::unordered_map<uint16_t, InstStat>()});
-  cpi.insert({ICL, std::unordered_map<uint16_t, InstStat>()});
-  cpi.insert({ICL__GENERIC_CACHE, std::unordered_map<uint16_t, InstStat>()});
-  cpi.insert({HIL, std::unordered_map<uint16_t, InstStat>()});
-  cpi.insert({NVME__CONTROLLER, std::unordered_map<uint16_t, InstStat>()});
-  cpi.insert({NVME__PRPLIST, std::unordered_map<uint16_t, InstStat>()});
-  cpi.insert({NVME__SGL, std::unordered_map<uint16_t, InstStat>()});
-  cpi.insert({NVME__SUBSYSTEM, std::unordered_map<uint16_t, InstStat>()});
-  cpi.insert({NVME__NAMESPACE, std::unordered_map<uint16_t, InstStat>()});
-  cpi.insert({NVME__OCSSD, std::unordered_map<uint16_t, InstStat>()});
-  cpi.insert({UFS__DEVICE, std::unordered_map<uint16_t, InstStat>()});
-  cpi.insert({SATA__DEVICE, std::unordered_map<uint16_t, InstStat>()});
-
-  // Insert item (Use cpu/generator/generate.py to generate this code)
-  cpi.find(0)->second.insert({0, InstStat(5, 32, 6, 13, 0, 1, clockPeriod)});
-  cpi.find(0)->second.insert({1, InstStat(5, 32, 6, 13, 0, 1, clockPeriod)});
-  cpi.find(0)->second.insert({3, InstStat(5, 32, 6, 13, 0, 1, clockPeriod)});
-  cpi.find(0)->second.insert({4, InstStat(4, 24, 4, 6, 0, 0, clockPeriod)});
-  cpi.find(1)->second.insert({0, InstStat(8, 28, 7, 18, 0, 1, clockPeriod)});
-  cpi.find(1)->second.insert({1, InstStat(8, 28, 7, 19, 0, 0, clockPeriod)});
-  cpi.find(1)->second.insert({3, InstStat(4, 28, 6, 11, 0, 0, clockPeriod)});
+  cpi.find(0)->second.insert(
+    {0, InstStat(5, 32, 6, 12, 0, 0, clockPeriod)});
+  cpi.find(0)->second.insert(
+      {1, InstStat(5, 32, 6, 12, 0, 0, clockPeriod)});
+  cpi.find(0)->second.insert(
+      {3, InstStat(5, 32, 6, 12, 0, 0, clockPeriod)});
+  cpi.find(0)->second.insert(
+      {4, InstStat(4, 24, 4, 5, 0, 0, clockPeriod)});
   cpi.find(1)->second.insert(
-      {4, InstStat(63, 180, 21, 147, 0, 2, clockPeriod)});
+      {0, InstStat(8, 28, 8, 19, 0, 1, clockPeriod)});
   cpi.find(1)->second.insert(
-      {9, InstStat(177, 504, 113, 415, 118, 19, clockPeriod)});
+      {1, InstStat(8, 28, 8, 20, 0, 0, clockPeriod)});
   cpi.find(1)->second.insert(
-      {10, InstStat(157, 616, 102, 338, 0, 2, clockPeriod)});
+      {3, InstStat(4, 28, 7, 12, 0, 0, clockPeriod)});
   cpi.find(1)->second.insert(
-      {5, InstStat(45, 180, 15, 155, 0, 0, clockPeriod)});
+      {4, InstStat(59, 196, 28, 104, 0, 3, clockPeriod)});
   cpi.find(1)->second.insert(
-      {6, InstStat(133, 452, 54, 377, 91, 1, clockPeriod)});
+      {9, InstStat(157, 484, 93, 289, 105, 9, clockPeriod)});
   cpi.find(1)->second.insert(
-      {8, InstStat(34, 140, 10, 146, 0, 0, clockPeriod)});
+      {10, InstStat(199, 624, 106, 317, 0, 1, clockPeriod)});
   cpi.find(1)->second.insert(
-      {7, InstStat(120, 236, 86, 260, 0, 1, clockPeriod)});
-  cpi.find(2)->second.insert({0, InstStat(8, 88, 17, 27, 0, 1, clockPeriod)});
-  cpi.find(2)->second.insert({1, InstStat(8, 88, 17, 27, 0, 1, clockPeriod)});
-  cpi.find(2)->second.insert({2, InstStat(5, 40, 6, 12, 0, 0, clockPeriod)});
-  cpi.find(2)->second.insert({3, InstStat(5, 40, 6, 12, 0, 0, clockPeriod)});
-  cpi.find(2)->second.insert({4, InstStat(5, 40, 6, 12, 0, 0, clockPeriod)});
+      {5, InstStat(190, 608, 121, 389, 0, 3, clockPeriod)});
+  cpi.find(1)->second.insert(
+      {6, InstStat(149, 568, 92, 348, 43, 3, clockPeriod)});
+  cpi.find(1)->second.insert(
+      {8, InstStat(25, 92, 15, 57, 0, 2, clockPeriod)});
+  cpi.find(1)->second.insert(
+      {7, InstStat(43, 112, 26, 134, 0, 3, clockPeriod)});
+  cpi.find(1)->second.insert(
+      {41, InstStat(27, 164, 24, 97, 0, 0, clockPeriod)});
+  cpi.find(1)->second.insert(
+      {42, InstStat(85, 460, 60, 187, 0, 2, clockPeriod)});
+  cpi.find(2)->second.insert(
+      {0, InstStat(10, 112, 22, 34, 0, 2, clockPeriod)});
+  cpi.find(2)->second.insert(
+      {1, InstStat(10, 112, 22, 34, 0, 2, clockPeriod)});
+  cpi.find(2)->second.insert(
+      {2, InstStat(5, 40, 6, 11, 0, 0, clockPeriod)});
+  cpi.find(2)->second.insert(
+      {3, InstStat(5, 40, 6, 11, 0, 2, clockPeriod)});
+  cpi.find(2)->second.insert(
+      {4, InstStat(5, 40, 6, 11, 0, 0, clockPeriod)});
   cpi.find(3)->second.insert(
-      {0, InstStat(90, 532, 64, 284, 0, 1, clockPeriod)});
+      {0, InstStat(88, 508, 73, 302, 0, 2, clockPeriod)});
   cpi.find(3)->second.insert(
-      {1, InstStat(82, 496, 53, 312, 0, 5, clockPeriod)});
-  cpi.find(3)->second.insert({2, InstStat(22, 120, 20, 59, 0, 2, clockPeriod)});
-  cpi.find(3)->second.insert({3, InstStat(22, 120, 20, 61, 0, 2, clockPeriod)});
-  cpi.find(3)->second.insert({4, InstStat(9, 72, 12, 86, 0, 1, clockPeriod)});
+      {1, InstStat(89, 548, 56, 341, 0, 1, clockPeriod)});
+  cpi.find(3)->second.insert(
+      {2, InstStat(22, 152, 26, 64, 0, 3, clockPeriod)});
+  cpi.find(3)->second.insert(
+      {3, InstStat(22, 152, 28, 65, 0, 1, clockPeriod)});
+  cpi.find(3)->second.insert(
+      {4, InstStat(9, 72, 13, 88, 0, 1, clockPeriod)});
   cpi.find(4)->second.insert(
-      {0, InstStat(61, 312, 102, 120, 0, 2, clockPeriod)});
+      {0, InstStat(39, 212, 47, 85, 0, 2, clockPeriod)});
   cpi.find(4)->second.insert(
-      {1, InstStat(61, 312, 102, 120, 0, 2, clockPeriod)});
-  cpi.find(4)->second.insert({2, InstStat(27, 100, 27, 49, 0, 1, clockPeriod)});
+      {1, InstStat(39, 212, 47, 85, 0, 0, clockPeriod)});
+  cpi.find(4)->second.insert(
+      {2, InstStat(36, 180, 40, 67, 0, 2, clockPeriod)});
   cpi.find(5)->second.insert(
-      {14, InstStat(44, 164, 32, 68, 0, 2, clockPeriod)});
-  cpi.find(5)->second.insert({13, InstStat(0, 0, 0, 0, 0, 0, clockPeriod)});
+      {14, InstStat(47, 208, 34, 82, 0, 5, clockPeriod)});
   cpi.find(5)->second.insert(
-      {16, InstStat(136, 360, 65, 230, 0, 3, clockPeriod)});
+      {13, InstStat(0, 0, 0, 0, 0, 0, clockPeriod)});
   cpi.find(5)->second.insert(
-      {15, InstStat(54, 140, 36, 91, 0, 8, clockPeriod)});
-  cpi.find(5)->second.insert({11, InstStat(0, 0, 0, 0, 0, 0, clockPeriod)});
-  cpi.find(5)->second.insert({12, InstStat(0, 0, 0, 0, 0, 0, clockPeriod)});
+      {16, InstStat(134, 384, 85, 180, 0, 7, clockPeriod)});
+  cpi.find(5)->second.insert(
+      {15, InstStat(58, 188, 44, 109, 0, 9, clockPeriod)});
+  cpi.find(5)->second.insert(
+      {11, InstStat(0, 0, 0, 0, 0, 0, clockPeriod)});
+  cpi.find(5)->second.insert(
+      {12, InstStat(0, 0, 0, 0, 0, 0, clockPeriod)});
   cpi.find(6)->second.insert(
-      {17, InstStat(41, 168, 42, 75, 0, 1, clockPeriod)});
+      {17, InstStat(43, 204, 50, 78, 0, 3, clockPeriod)});
   cpi.find(6)->second.insert(
-      {0, InstStat(99, 456, 94, 177, 0, 6, clockPeriod)});
+      {0, InstStat(108, 512, 112, 208, 0, 8, clockPeriod)});
   cpi.find(6)->second.insert(
-      {1, InstStat(99, 456, 94, 177, 0, 6, clockPeriod)});
+      {1, InstStat(108, 512, 112, 208, 0, 7, clockPeriod)});
   cpi.find(7)->second.insert(
-      {18, InstStat(44, 152, 35, 78, 0, 2, clockPeriod)});
+      {18, InstStat(46, 180, 44, 82, 0, 2, clockPeriod)});
   cpi.find(7)->second.insert(
-      {0, InstStat(99, 456, 94, 177, 0, 6, clockPeriod)});
+      {0, InstStat(108, 512, 112, 208, 0, 8, clockPeriod)});
   cpi.find(7)->second.insert(
-      {1, InstStat(99, 456, 94, 177, 0, 6, clockPeriod)});
+      {1, InstStat(108, 512, 112, 208, 0, 7, clockPeriod)});
   cpi.find(8)->second.insert(
-      {19, InstStat(119, 220, 45, 160, 0, 6, clockPeriod)});
-  cpi.find(8)->second.insert({20, InstStat(4, 40, 14, 110, 0, 1, clockPeriod)});
+      {19, InstStat(123, 212, 51, 170, 0, 5, clockPeriod)});
   cpi.find(8)->second.insert(
-      {21, InstStat(70, 200, 42, 161, 0, 1, clockPeriod)});
-  cpi.find(9)->second.insert({19, InstStat(27, 44, 5, 37, 0, 0, clockPeriod)});
+      {20, InstStat(5, 44, 18, 119, 0, 0, clockPeriod)});
+  cpi.find(8)->second.insert(
+      {21, InstStat(73, 204, 51, 173, 0, 2, clockPeriod)});
   cpi.find(9)->second.insert(
-      {0, InstStat(82, 292, 42, 128, 0, 4, clockPeriod)});
+      {19, InstStat(32, 52, 7, 45, 0, 0, clockPeriod)});
   cpi.find(9)->second.insert(
-      {1, InstStat(86, 304, 47, 141, 0, 3, clockPeriod)});
-  cpi.find(9)->second.insert({2, InstStat(51, 124, 28, 78, 0, 3, clockPeriod)});
+      {0, InstStat(87, 396, 62, 145, 0, 3, clockPeriod)});
   cpi.find(9)->second.insert(
-      {22, InstStat(131, 364, 71, 200, 0, 7, clockPeriod)});
+      {1, InstStat(90, 388, 61, 150, 0, 4, clockPeriod)});
+  cpi.find(9)->second.insert(
+      {2, InstStat(57, 196, 43, 102, 0, 3, clockPeriod)});
+  cpi.find(9)->second.insert(
+      {22, InstStat(130, 464, 95, 220, 0, 6, clockPeriod)});
   cpi.find(10)->second.insert(
-      {19, InstStat(155, 100, 12, 208, 0, 4, clockPeriod)});
+      {19, InstStat(159, 132, 16, 216, 0, 3, clockPeriod)});
   cpi.find(10)->second.insert(
-      {0, InstStat(93, 284, 60, 146, 0, 5, clockPeriod)});
+      {0, InstStat(98, 356, 76, 167, 0, 3, clockPeriod)});
   cpi.find(10)->second.insert(
-      {1, InstStat(95, 276, 60, 150, 0, 4, clockPeriod)});
+      {1, InstStat(99, 344, 74, 171, 0, 3, clockPeriod)});
   cpi.find(10)->second.insert(
-      {22, InstStat(119, 328, 76, 186, 0, 4, clockPeriod)});
+      {22, InstStat(126, 416, 99, 216, 0, 7, clockPeriod)});
   cpi.find(10)->second.insert(
-      {5, InstStat(54, 172, 69, 89, 0, 1, clockPeriod)});
+      {5, InstStat(57, 216, 69, 100, 0, 5, clockPeriod)});
   cpi.find(10)->second.insert(
-      {6, InstStat(72, 236, 77, 141, 0, 3, clockPeriod)});
+      {6, InstStat(74, 280, 77, 150, 0, 5, clockPeriod)});
   cpi.find(10)->second.insert(
-      {7, InstStat(68, 204, 77, 116, 0, 1, clockPeriod)});
+      {7, InstStat(70, 248, 77, 125, 0, 4, clockPeriod)});
   cpi.find(10)->second.insert(
-      {20, InstStat(65, 388, 63, 303, 0, 1, clockPeriod)});
+      {20, InstStat(52, 300, 47, 244, 0, 1, clockPeriod)});
   cpi.find(10)->second.insert(
-      {23, InstStat(128, 368, 76, 204, 0, 4, clockPeriod)});
+      {23, InstStat(128, 448, 95, 225, 0, 4, clockPeriod)});
   cpi.find(10)->second.insert(
-      {24, InstStat(128, 384, 81, 209, 0, 6, clockPeriod)});
+      {24, InstStat(130, 468, 96, 230, 0, 8, clockPeriod)});
   cpi.find(10)->second.insert(
-      {25, InstStat(69, 184, 43, 112, 0, 4, clockPeriod)});
+      {25, InstStat(72, 228, 56, 130, 0, 4, clockPeriod)});
   cpi.find(10)->second.insert(
-      {26, InstStat(206, 692, 157, 315, 0, 5, clockPeriod)});
+      {26, InstStat(134, 448, 91, 232, 0, 9, clockPeriod)});
   cpi.find(10)->second.insert(
-      {27, InstStat(183, 620, 154, 284, 0, 6, clockPeriod)});
+      {27, InstStat(149, 488, 102, 255, 0, 7, clockPeriod)});
   cpi.find(10)->second.insert(
-      {28, InstStat(162, 460, 78, 227, 0, 4, clockPeriod)});
+      {28, InstStat(121, 372, 79, 211, 0, 8, clockPeriod)});
   cpi.find(11)->second.insert(
-      {29, InstStat(51, 132, 40, 97, 0, 0, clockPeriod)});
+      {29, InstStat(50, 160, 36, 85, 0, 0, clockPeriod)});
   cpi.find(11)->second.insert(
-      {30, InstStat(212, 460, 117, 491, 0, 9, clockPeriod)});
+      {30, InstStat(247, 628, 156, 545, 0, 5, clockPeriod)});
   cpi.find(11)->second.insert(
-      {31, InstStat(42, 172, 43, 74, 0, 2, clockPeriod)});
+      {31, InstStat(46, 208, 53, 88, 0, 2, clockPeriod)});
   cpi.find(11)->second.insert(
-      {32, InstStat(42, 172, 43, 74, 0, 2, clockPeriod)});
-  cpi.find(11)->second.insert({0, InstStat(29, 76, 17, 51, 0, 2, clockPeriod)});
-  cpi.find(11)->second.insert({1, InstStat(29, 76, 17, 51, 0, 2, clockPeriod)});
-  cpi.find(11)->second.insert({2, InstStat(25, 64, 18, 44, 0, 1, clockPeriod)});
+      {32, InstStat(46, 208, 53, 88, 0, 1, clockPeriod)});
+  cpi.find(11)->second.insert(
+      {0, InstStat(30, 92, 19, 58, 0, 4, clockPeriod)});
+  cpi.find(11)->second.insert(
+      {1, InstStat(30, 92, 19, 58, 0, 3, clockPeriod)});
+  cpi.find(11)->second.insert(
+      {2, InstStat(26, 80, 20, 50, 0, 2, clockPeriod)});
   cpi.find(12)->second.insert(
-      {19, InstStat(157, 352, 69, 178, 0, 1, clockPeriod)});
+      {19, InstStat(165, 656, 120, 239, 0, 2, clockPeriod)});
   cpi.find(12)->second.insert(
-      {31, InstStat(42, 172, 43, 73, 0, 3, clockPeriod)});
+      {31, InstStat(46, 208, 53, 88, 0, 2, clockPeriod)});
   cpi.find(12)->second.insert(
-      {32, InstStat(42, 172, 43, 73, 0, 3, clockPeriod)});
+      {32, InstStat(46, 208, 53, 88, 0, 2, clockPeriod)});
   cpi.find(12)->second.insert(
-      {0, InstStat(28, 84, 23, 119, 0, 0, clockPeriod)});
+      {0, InstStat(29, 96, 23, 127, 0, 6, clockPeriod)});
   cpi.find(12)->second.insert(
-      {1, InstStat(28, 84, 23, 120, 0, 1, clockPeriod)});
-  cpi.find(12)->second.insert({2, InstStat(25, 64, 18, 44, 0, 1, clockPeriod)});
+      {1, InstStat(29, 96, 23, 127, 0, 4, clockPeriod)});
   cpi.find(12)->second.insert(
-      {33, InstStat(57, 212, 36, 128, 0, 3, clockPeriod)});
+      {2, InstStat(26, 80, 20, 50, 0, 4, clockPeriod)});
   cpi.find(12)->second.insert(
-      {34, InstStat(34, 116, 29, 72, 0, 3, clockPeriod)});
-  cpi.find(12)->second.insert({35, InstStat(16, 64, 9, 38, 0, 1, clockPeriod)});
+      {33, InstStat(61, 264, 44, 149, 0, 5, clockPeriod)});
   cpi.find(12)->second.insert(
-      {36, InstStat(28, 72, 15, 48, 0, 2, clockPeriod)});
+      {34, InstStat(36, 156, 34, 81, 0, 2, clockPeriod)});
   cpi.find(12)->second.insert(
-      {37, InstStat(57, 212, 36, 127, 0, 3, clockPeriod)});
+      {35, InstStat(16, 84, 11, 41, 0, 0, clockPeriod)});
   cpi.find(12)->second.insert(
-      {38, InstStat(34, 128, 31, 68, 0, 2, clockPeriod)});
+      {36, InstStat(30, 116, 20, 57, 0, 6, clockPeriod)});
   cpi.find(12)->second.insert(
-      {39, InstStat(18, 56, 10, 37, 0, 1, clockPeriod)});
+      {37, InstStat(61, 264, 44, 148, 0, 7, clockPeriod)});
   cpi.find(12)->second.insert(
-      {40, InstStat(33, 100, 17, 61, 0, 3, clockPeriod)});
+      {38, InstStat(36, 168, 36, 77, 0, 0, clockPeriod)});
+  cpi.find(12)->second.insert(
+      {39, InstStat(18, 76, 11, 39, 0, 0, clockPeriod)});
+  cpi.find(12)->second.insert(
+      {40, InstStat(35, 140, 22, 69, 0, 0, clockPeriod)});
 }
 
 CPU::~CPU() {}

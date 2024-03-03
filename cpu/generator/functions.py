@@ -87,6 +87,8 @@ function = [
     ["ftl/page_mapping.cc", "writeInternal", 1, 6],
     ["ftl/page_mapping.cc", "trimInternal", 1, 8],
     ["ftl/page_mapping.cc", "eraseInternal", 1, 7],
+    ["ftl/page_mapping.cc", "getCompressedLengthFromDisk", 1, 41],
+    ["ftl/page_mapping.cc", "copySubmit", 1, 42],
     ["icl/icl.cc", "read", 2, 0],
     ["icl/icl.cc", "write", 2, 1],
     ["icl/icl.cc", "flush", 2, 2],

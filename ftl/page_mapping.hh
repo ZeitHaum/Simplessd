@@ -113,8 +113,6 @@ class PageMapping : public AbstractFTL {
     uint64_t totalWriteIoUnitCount; // total write I/O unit
     uint64_t failedCompressCout; // trigged compress but failed count(may be compressed length too large).
     // new added to observe latency model
-    uint64_t gcIoLatency;
-    clock_t gcClockCycles;
   } stat;
 
   CompressedDiskInfo* cd_info;
@@ -128,7 +126,7 @@ class PageMapping : public AbstractFTL {
   void calculateVictimWeight(std::vector<std::pair<uint32_t, float>> &,
                              const EVICT_POLICY, uint64_t);
   void selectVictimBlock(std::vector<uint32_t> &, uint64_t &);
-  void getCompressedLengthFromDisk(uint64_t, uint32_t,const MapEntry&, CopyInfo&);
+  void getCompressedLengthFromDisk(uint64_t, uint32_t,const MapEntry&, CopyInfo&, uint64_t&);
   void doGarbageCollection(std::vector<uint32_t> &, uint64_t &);  
 
   float calculateWearLeveling();
@@ -136,7 +134,7 @@ class PageMapping : public AbstractFTL {
 
   void readInternal(Request &, uint64_t &);
   void writeInternal(Request &, uint64_t &, bool = true);
-  void copySubmit(PAL::Request&, std::vector<PAL::Request>&, Bitset&,  uint64_t);
+  void copySubmit(PAL::Request&, std::vector<PAL::Request>&, Bitset&,  uint64_t&);
   void trimInternal(Request &, uint64_t &);
   void eraseInternal(PAL::Request &, uint64_t &);
   BlockStat calculateBlockStat();  
