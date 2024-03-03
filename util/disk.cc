@@ -446,14 +446,16 @@ void CompressedDisk::decompressRead(uint64_t idx, uint8_t* buffer){
     //Do Nothing.
   }
   else{
-    clock_t begin_c = clock();
+    clock_t begin_clk = clock();
+    uint64_t begin_tsc = __builtin_ia32_rdtsc();
     uint64_t src_len = getCompressedLength(idx);
     uint64_t dest_len = 0;
     compressor->decompress(buffer, src_len, dest_len);
     memcpy(buffer, compressor->buffer, dest_len);
     // debugprint(LOG_COMMON, "DecompressRead In CompressedDisk: idx = %" PRIu64 "src_len = %" PRIu64 "dest_len = %" PRIu64, idx, src_len, dest_len);
     ++stats.decompressCout;
-    stats.decompressCycles += clock() - begin_c;
+    stats.decompressCyclesClk += clock() - begin_clk;
+    stats.decompressCyclesTsc += __builtin_ia32_rdtsc() - begin_tsc;
   }
 }
 
@@ -481,7 +483,8 @@ bool CompressedDisk::compressWrite(uint64_t idx, uint8_t* buffer){
     panic("Error: Already Compressed");
   }
   else{
-    clock_t begin_c = clock();
+    clock_t begin_clk = clock();
+    uint64_t begin_tsc = __builtin_ia32_rdtsc();
     uint64_t src_len = compress_unit_size;
     uint64_t dest_len = 0;
     compressor->compress(buffer, src_len, dest_len);
@@ -493,7 +496,8 @@ bool CompressedDisk::compressWrite(uint64_t idx, uint8_t* buffer){
     writeOrdinary(idx * compress_unit_size, compress_unit_size, compressor->buffer);
     // debugprint(LOG_COMMON, "CompressWrite In CompressedDisk: idx = %" PRIu64 " ,src_len = %" PRIu64 " ,dest_len = %" PRIu64, idx, src_len, dest_len);
     ++stats.compressCount;
-    stats.compressCycles += clock() - begin_c;
+    stats.compressCyclesClk += clock() - begin_clk;
+    stats.compressCyclesTsc += __builtin_ia32_rdtsc() - begin_tsc;
   }
   return true;
 }
@@ -506,7 +510,8 @@ bool CompressedDisk::compressBufferWrite(uint64_t idx, uint64_t& dest_len, uint8
     panic("Error: Already Compressed");
   }
   else{
-    clock_t begin_c = clock();
+    clock_t begin_clk = clock();
+    uint64_t begin_tsc = __builtin_ia32_rdtsc();
     uint64_t src_len = compress_unit_size;
     dest_len = 0;
     compressor->compress(write_data, src_len, dest_len);
@@ -516,7 +521,8 @@ bool CompressedDisk::compressBufferWrite(uint64_t idx, uint64_t& dest_len, uint8
     }
     memcpy(buffer, compressor->buffer, dest_len);
     ++stats.compressCount;
-    stats.compressCycles += clock() - begin_c;
+    stats.compressCyclesClk += clock() - begin_clk;
+    stats.compressCyclesTsc += __builtin_ia32_rdtsc() - begin_tsc;
   }
   return true;
 }

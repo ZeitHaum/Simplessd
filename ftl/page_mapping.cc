@@ -647,7 +647,6 @@ void PageMapping::getCompressedLengthFromDisk(uint64_t lpn, uint32_t idx, const 
 
 void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                                       uint64_t &tick) {
-  uint64_t cp_tick = tick;
   PAL::Request req(param.ioUnitInPage);
   std::vector<PAL::Request> readRequests;
   std::vector<PAL::Request> writeRequests;
@@ -758,8 +757,6 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
   }
 
   tick = MAX(writeFinishedAt, eraseFinishedAt);
-  uint64_t io_lat = tick - cp_tick;
-  debugprint(LOG_FTL_PAGE_MAPPING, "%" PRIu64, io_lat);
   tick += applyLatency(CPU::FTL__PAGE_MAPPING, CPU::DO_GARBAGE_COLLECTION);
 }
 
@@ -1022,6 +1019,8 @@ void PageMapping::copySubmit(PAL::Request& req, std::vector<PAL::Request>& write
       else {
         req.ioFlag.set();
       }
+      req.blockIndex = freeBlock.getBlockIndex();
+      req.pageIndex = newPgaeIdx;
 
       writeRequests.push_back(req);
       // Update mapping table
@@ -1262,16 +1261,24 @@ void PageMapping::getStatList(std::vector<Stats> &list, std::string prefix) {
   temp.desc = "Compress trigged count(include compressWrite and compressBufferWrite).";
   list.push_back(temp);
 
-  temp.name = prefix + "page_mapping.compDisk.compressCycles";
-  temp.desc = "Total compress clock cycles.";
+  temp.name = prefix + "page_mapping.compDisk.compressCyclesClk";
+  temp.desc = "Total compress clock cycles(Use clock()).";
+  list.push_back(temp);
+
+  temp.name = prefix + "page_mapping.compDisk.compressCyclesTsc";
+  temp.desc = "Total compress clock cycles(Use __builtin_ia32_rdtsc()).";
   list.push_back(temp);
 
   temp.name = prefix + "page_mapping.compDisk.decompressCount";
   temp.desc = "Decompress triggged count(only in readInternal).";
   list.push_back(temp);
 
-  temp.name = prefix + "page_mapping.compDisk.decompressCycles";
-  temp.desc = "Total decompress clock cycles";
+  temp.name = prefix + "page_mapping.compDisk.decompressCyclesClk";
+  temp.desc = "Total decompress clock cycles(Use clock()).";
+  list.push_back(temp);
+
+  temp.name = prefix + "page_mapping.compDisk.decompressCyclesTsc";
+  temp.desc = "Total decompress clock cycles(Use __builtin_ia32_rdtsc()).";
   list.push_back(temp);
 }
 
@@ -1295,11 +1302,15 @@ void PageMapping::getStatValues(std::vector<double> &values) {
   CompressedDisk::CompressDiskStats* diskStats = getCompDiskStat();
   if(diskStats){
     values.push_back(diskStats->compressCount);
-    values.push_back(diskStats->compressCycles);
+    values.push_back(diskStats->compressCyclesClk);
+    values.push_back(diskStats->compressCyclesTsc);
     values.push_back(diskStats->decompressCout);
-    values.push_back(diskStats->decompressCycles);
+    values.push_back(diskStats->decompressCyclesClk);
+    values.push_back(diskStats->decompressCyclesTsc);
   }
   else{
+    values.push_back(0);
+    values.push_back(0);
     values.push_back(0);
     values.push_back(0);
     values.push_back(0);

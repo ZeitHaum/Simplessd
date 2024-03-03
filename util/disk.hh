@@ -101,9 +101,11 @@ class CompressedDisk: public Disk{
     struct CompressDiskStats{
       /* data */
       uint64_t compressCount;
-      clock_t compressCycles;
+      clock_t compressCyclesClk;
+      uint64_t compressCyclesTsc;
       uint64_t decompressCout;
-      clock_t decompressCycles;
+      clock_t decompressCyclesClk;
+      uint64_t decompressCyclesTsc;
     } stats;
     CompressedDisk();
     void init(uint32_t, CompressType);
