@@ -140,6 +140,7 @@ class PageMapping : public AbstractFTL {
   void trimInternal(Request &, uint64_t &);
   void eraseInternal(PAL::Request &, uint64_t &);
   BlockStat calculateBlockStat();  
+  CompressedDisk::CompressDiskStats* getCompDiskStat();
 
  public:
   PageMapping(ConfigReader &, Parameter &, PAL::PAL *, DRAM::AbstractDRAM *);

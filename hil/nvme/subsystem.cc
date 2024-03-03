@@ -89,6 +89,10 @@ void Subsystem::init() {
     info.dataProtectionSettings = 0x00;
     info.namespaceSharingCapabilities = 0x00;
 
+    if(nNamespaces > 1){
+      panic("Not support multi namespace now.");
+    }
+
     for (uint16_t i = 0; i < nNamespaces; i++) {
       info.size = totalSize / nNamespaces;
       info.capacity = info.size;

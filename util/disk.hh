@@ -28,6 +28,7 @@
 #include <unordered_map>
 #include <vector>
 #include <util/compressor.hh>
+#include "time.h"
 
 namespace SimpleSSD {
 
@@ -95,7 +96,15 @@ class CompressedDisk: public Disk{
     uint32_t compress_unit_size;
     uint32_t compress_unit_totalcnt; 
     std::unordered_map<uint64_t, uint64_t> compressed_table;
+    
   public:
+    struct CompressDiskStats{
+      /* data */
+      uint64_t compressCount;
+      clock_t compressCycles;
+      uint64_t decompressCout;
+      clock_t decompressCycles;
+    } stats;
     CompressedDisk();
     void init(uint32_t, CompressType);
     uint64_t getCompressedLength(uint64_t idx);

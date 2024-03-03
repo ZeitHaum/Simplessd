@@ -1265,6 +1265,22 @@ void PageMapping::getStatList(std::vector<Stats> &list, std::string prefix) {
   temp.name = prefix + "page_mapping.latency.gcClockCycles";
   temp.desc = "Use clock() function to measure the actual cpu clocks of gc";
   list.push_back(temp);
+
+  temp.name = prefix + "page_mapping.compDisk.compressCount";
+  temp.desc = "Compress trigged count(include compressWrite and compressBufferWrite).";
+  list.push_back(temp);
+
+  temp.name = prefix + "page_mapping.compDisk.compressCycles";
+  temp.desc = "Total compress clock cycles.";
+  list.push_back(temp);
+
+  temp.name = prefix + "page_mapping.compDisk.decompressCount";
+  temp.desc = "Decompress triggged count(only in readInternal).";
+  list.push_back(temp);
+
+  temp.name = prefix + "page_mapping.compDisk.decompressCycles";
+  temp.desc = "Total decompress clock cycles";
+  list.push_back(temp);
 }
 
 void PageMapping::getStatValues(std::vector<double> &values) {
@@ -1286,6 +1302,31 @@ void PageMapping::getStatValues(std::vector<double> &values) {
   values.push_back(stat.failedCompressCout);
   values.push_back(stat.gcIoLatency);
   values.push_back(stat.gcClockCycles);
+  CompressedDisk::CompressDiskStats* diskStats = getCompDiskStat();
+  if(diskStats){
+    values.push_back(diskStats->compressCount);
+    values.push_back(diskStats->compressCycles);
+    values.push_back(diskStats->decompressCout);
+    values.push_back(diskStats->decompressCycles);
+  }
+  else{
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+    values.push_back(0);
+  }
+}
+
+CompressedDisk::CompressDiskStats* PageMapping::getCompDiskStat(){
+  CompressedDisk::CompressDiskStats* ret = nullptr;
+  CompressedDisk* comp_disk = dynamic_cast<CompressedDisk*>(cd_info->pDisk);
+  if(comp_disk){
+    ret = &comp_disk->stats;
+  }
+  else{
+    ret = nullptr;
+  }
+  return ret;
 }
 
 void PageMapping::resetStatValues() {

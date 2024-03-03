@@ -443,14 +443,17 @@ uint16_t CompressedDisk::read(uint64_t slba, uint16_t nlblk, uint8_t *buffer){
 
 void CompressedDisk::decompressRead(uint64_t idx, uint8_t* buffer){
   if(!isCompressed(idx)){
-    // do Nothing.
+    //Do Nothing.
   }
   else{
+    clock_t begin_c = clock();
     uint64_t src_len = getCompressedLength(idx);
     uint64_t dest_len = 0;
     compressor->decompress(buffer, src_len, dest_len);
     memcpy(buffer, compressor->buffer, dest_len);
     // debugprint(LOG_COMMON, "DecompressRead In CompressedDisk: idx = %" PRIu64 "src_len = %" PRIu64 "dest_len = %" PRIu64, idx, src_len, dest_len);
+    ++stats.decompressCout;
+    stats.decompressCycles += clock() - begin_c;
   }
 }
 
@@ -473,11 +476,12 @@ uint16_t CompressedDisk::write(uint64_t slba, uint16_t nlblk, uint8_t *buffer){
 }
 
 bool CompressedDisk::compressWrite(uint64_t idx, uint8_t* buffer){
-//ret 表示是否压缩成功
+  //ret 表示是否压缩成功
   if(isCompressed(idx)){
     panic("Error: Already Compressed");
   }
   else{
+    clock_t begin_c = clock();
     uint64_t src_len = compress_unit_size;
     uint64_t dest_len = 0;
     compressor->compress(buffer, src_len, dest_len);
@@ -488,6 +492,8 @@ bool CompressedDisk::compressWrite(uint64_t idx, uint8_t* buffer){
     compressed_table[idx] = dest_len;
     writeOrdinary(idx * compress_unit_size, compress_unit_size, compressor->buffer);
     // debugprint(LOG_COMMON, "CompressWrite In CompressedDisk: idx = %" PRIu64 " ,src_len = %" PRIu64 " ,dest_len = %" PRIu64, idx, src_len, dest_len);
+    ++stats.compressCount;
+    stats.compressCycles += clock() - begin_c;
   }
   return true;
 }
@@ -500,6 +506,7 @@ bool CompressedDisk::compressBufferWrite(uint64_t idx, uint64_t& dest_len, uint8
     panic("Error: Already Compressed");
   }
   else{
+    clock_t begin_c = clock();
     uint64_t src_len = compress_unit_size;
     dest_len = 0;
     compressor->compress(write_data, src_len, dest_len);
@@ -508,6 +515,8 @@ bool CompressedDisk::compressBufferWrite(uint64_t idx, uint64_t& dest_len, uint8
       return false;
     }
     memcpy(buffer, compressor->buffer, dest_len);
+    ++stats.compressCount;
+    stats.compressCycles += clock() - begin_c;
   }
   return true;
 }
