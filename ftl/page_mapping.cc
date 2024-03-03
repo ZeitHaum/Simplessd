@@ -647,6 +647,7 @@ void PageMapping::getCompressedLengthFromDisk(uint64_t lpn, uint32_t idx, const 
 
 void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
                                       uint64_t &tick) {
+  uint64_t cp_tick = tick;
   PAL::Request req(param.ioUnitInPage);
   std::vector<PAL::Request> readRequests;
   std::vector<PAL::Request> writeRequests;
@@ -757,6 +758,8 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
   }
 
   tick = MAX(writeFinishedAt, eraseFinishedAt);
+  uint64_t io_lat = tick - cp_tick;
+  debugprint(LOG_FTL_PAGE_MAPPING, "%" PRIu64, io_lat);
   tick += applyLatency(CPU::FTL__PAGE_MAPPING, CPU::DO_GARBAGE_COLLECTION);
 }
 
@@ -1054,7 +1057,7 @@ void PageMapping::copySubmit(PAL::Request& req, std::vector<PAL::Request>& write
     }
   }
   nowCopyReq.clear();
-  tick +=  tick += applyLatency(CPU::FTL__PAGE_MAPPING, CPU::COPY_SUBMIT);
+  tick += applyLatency(CPU::FTL__PAGE_MAPPING, CPU::COPY_SUBMIT);
 }
 
 void PageMapping::trimInternal(Request &req, uint64_t &tick) {

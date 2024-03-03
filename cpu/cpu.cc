@@ -144,6 +144,21 @@ CPU::CPU(ConfigReader &c) : conf(c), lastResetStat(0) {
   ftlCore.resize(conf.readUint(CONFIG_CPU, CPU_CORE_FTL));
 
   // Initialize CPU table
+  cpi.insert({FTL, std::unordered_map<uint16_t, InstStat>()});
+  cpi.insert({FTL__PAGE_MAPPING, std::unordered_map<uint16_t, InstStat>()});
+  cpi.insert({ICL, std::unordered_map<uint16_t, InstStat>()});
+  cpi.insert({ICL__GENERIC_CACHE, std::unordered_map<uint16_t, InstStat>()});
+  cpi.insert({HIL, std::unordered_map<uint16_t, InstStat>()});
+  cpi.insert({NVME__CONTROLLER, std::unordered_map<uint16_t, InstStat>()});
+  cpi.insert({NVME__PRPLIST, std::unordered_map<uint16_t, InstStat>()});
+  cpi.insert({NVME__SGL, std::unordered_map<uint16_t, InstStat>()});
+  cpi.insert({NVME__SUBSYSTEM, std::unordered_map<uint16_t, InstStat>()});
+  cpi.insert({NVME__NAMESPACE, std::unordered_map<uint16_t, InstStat>()});
+  cpi.insert({NVME__OCSSD, std::unordered_map<uint16_t, InstStat>()});
+  cpi.insert({UFS__DEVICE, std::unordered_map<uint16_t, InstStat>()});
+  cpi.insert({SATA__DEVICE, std::unordered_map<uint16_t, InstStat>()});
+
+  // Insert item (Use cpu/generator/generate.py to generate this code)
   cpi.find(0)->second.insert(
     {0, InstStat(5, 32, 6, 12, 0, 0, clockPeriod)});
   cpi.find(0)->second.insert(
