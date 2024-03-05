@@ -32,12 +32,17 @@
 
 namespace SimpleSSD {
 
+enum class CompressType{
+  NONE, LZ4, LZMA
+};
+
 class Disk {
  protected:
   std::string filename;
   uint64_t diskSize;
   uint32_t sectorSize;
   std::fstream disk;
+  CompressType compType;
 
  public:
   Disk();
@@ -52,6 +57,7 @@ class Disk {
   virtual uint16_t write(uint64_t, uint16_t, uint8_t *);
   virtual uint64_t writeOrdinary(uint64_t, uint64_t, uint8_t *);
   virtual uint16_t erase(uint64_t, uint16_t);
+  CompressType getCompressType();
 };
 
 class CoWDisk : public Disk {
@@ -84,10 +90,6 @@ class MemDisk : public Disk {
   uint16_t read(uint64_t, uint16_t, uint8_t *) override;
   uint16_t write(uint64_t, uint16_t, uint8_t *) override;
   uint16_t erase(uint64_t, uint16_t) override;
-};
-
-enum class CompressType{
-  NONE, LZ4, LZMA
 };
   
 class CompressedDisk: public Disk{

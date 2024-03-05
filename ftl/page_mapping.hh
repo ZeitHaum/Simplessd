@@ -115,7 +115,7 @@ class PageMapping : public AbstractFTL {
     // new added to observe latency model
   } stat;
 
-  CompressedDiskInfo* cd_info;
+  CompressedDiskInfo cd_info;
   uint8_t* compressedBuffer;
 
   float freeBlockRatio();

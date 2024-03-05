@@ -116,8 +116,7 @@ PageMapping::PageMapping(ConfigReader &c, Parameter &p, PAL::PAL *l,
       lastFreeBlock(param.pageCountToMaxPerf),
       lastFreeBlockIOMap(param.ioUnitInPage),
       nowCopyReq(&param),
-      bReclaimMore(false),
-      cd_info(nullptr)
+      bReclaimMore(false)
        {
   Block::setStaticAttr(param.ioUnitSize, param.maxCompressUnitInPage);
   blocks.reserve(param.totalPhysicalBlocks);
@@ -270,7 +269,7 @@ bool PageMapping::initialize() {
 
 void PageMapping::read(Request &req, uint64_t &tick) {
   uint64_t begin = tick;
-  this->cd_info = &req.cd_info;
+  this->cd_info = req.cd_info;
 
   if (req.ioFlag.count() > 0) {
     readInternal(req, tick);
@@ -289,7 +288,7 @@ void PageMapping::read(Request &req, uint64_t &tick) {
 
 void PageMapping::write(Request &req, uint64_t &tick) {
   uint64_t begin = tick;
-  this->cd_info = &req.cd_info;
+  this->cd_info = req.cd_info;
 
   if (req.ioFlag.count() > 0) {
     writeInternal(req, tick);
@@ -308,7 +307,7 @@ void PageMapping::write(Request &req, uint64_t &tick) {
 
 void PageMapping::trim(Request &req, uint64_t &tick) {
   uint64_t begin = tick;
-  this->cd_info = &req.cd_info;
+  this->cd_info = req.cd_info;
 
   trimInternal(req, tick);
 
@@ -606,10 +605,10 @@ void PageMapping::getCompressedLengthFromDisk(uint64_t lpn, uint32_t idx, const 
   }
   else if(mapping.is_compressed == 0x0){
     //Not Compressed, Need Compress.
-    uint64_t disk_offset = (lpn * param.ioUnitInPage + idx) * param.ioUnitSize - cd_info->offset;
+    uint64_t disk_offset = (lpn * param.ioUnitInPage + idx) * param.ioUnitSize - cd_info.offset;
     uint64_t disk_length = param.ioUnitSize;
-    CompressedDisk* pcDisk = ((CompressedDisk*)(cd_info->pDisk));
-    if(cd_info->pDisk){
+    CompressedDisk* pcDisk = ((CompressedDisk*)(cd_info.pDisk));
+    if(cd_info.pDisk){
       CompressedLength = pcDisk->getCompressedLength(disk_offset/param.ioUnitSize);
       if(CompressedLength == param.ioUnitSize){
         //Need Compress
@@ -1044,8 +1043,8 @@ void PageMapping::copySubmit(PAL::Request& req, std::vector<PAL::Request>& write
         //Submit disk
         if(copy_info.changed_data!= nullptr){
           assert(copy_info.old_len != copy_info.new_len);
-          cd_info->pDisk->writeOrdinary(copy_info.disk_idx * param.ioUnitSize, param.ioUnitSize, copy_info.changed_data);
-          ((CompressedDisk*)(cd_info->pDisk))->setCompressedLength(copy_info.disk_idx, copy_info.new_len);
+          cd_info.pDisk->writeOrdinary(copy_info.disk_idx * param.ioUnitSize, param.ioUnitSize, copy_info.changed_data);
+          ((CompressedDisk*)(cd_info.pDisk))->setCompressedLength(copy_info.disk_idx, copy_info.new_len);
           //clear
           delete[] copy_info.changed_data;
           copy_info.changed_data = nullptr;
@@ -1320,7 +1319,10 @@ void PageMapping::getStatValues(std::vector<double> &values) {
 
 CompressedDisk::CompressDiskStats* PageMapping::getCompDiskStat(){
   CompressedDisk::CompressDiskStats* ret = nullptr;
-  CompressedDisk* comp_disk = dynamic_cast<CompressedDisk*>(cd_info->pDisk);
+  CompressedDisk* comp_disk = nullptr; 
+  if(cd_info.pDisk && cd_info.pDisk->getCompressType() != CompressType::NONE){
+    comp_disk = (CompressedDisk*)(cd_info.pDisk);
+  }
   if(comp_disk){
     ret = &comp_disk->stats;
   }

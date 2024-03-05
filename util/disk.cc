@@ -33,7 +33,7 @@
 
 namespace SimpleSSD {
 
-Disk::Disk() : diskSize(0), sectorSize(0){}
+Disk::Disk() : diskSize(0), sectorSize(0), compType(CompressType::NONE){}
 
 Disk::~Disk() {
   close();
@@ -177,6 +177,10 @@ uint16_t Disk::write(uint64_t slba, uint16_t nlblk, uint8_t *buffer) {
 
 uint16_t Disk::erase(uint64_t, uint16_t nlblk) {
   return nlblk;
+}
+
+CompressType Disk::getCompressType(){
+  return compType;
 }
 
 CoWDisk::CoWDisk() {}
@@ -368,6 +372,7 @@ uint64_t Disk::writeOrdinary(uint64_t offset, uint64_t length, uint8_t*  buffer)
 
 CompressedDisk::CompressedDisk(){
   compressor = nullptr;
+  memset(&stats, 0, sizeof(CompressDiskStats));
 }
 
 CompressedDisk::~CompressedDisk(){
@@ -388,6 +393,7 @@ void CompressedDisk::init(uint32_t cdsize, CompressType compressType){
   else{
     panic("Undefine CompressType!");
   }
+  this->compType = compressType;
   this->compress_unit_totalcnt = diskSize / compress_unit_size  + 1;
   compressed_table.reserve(this->compress_unit_totalcnt);
   debugprint(LOG_COMMON, "CompressedDiskInit: compress_unit_size = %" PRIu32 ", compress_unit_totalcnt = %" PRIu32, compress_unit_size, compress_unit_totalcnt);
