@@ -59,6 +59,37 @@ Subsystem::~Subsystem() {
   delete pHIL;
 }
 
+void Subsystem::printCompressInfo(){
+  CompressType compType = (CompressType)conf.readUint(CONFIG_NVME, NVME_COMPRESS_TYPE);
+  FTL::COMPRESS_METHOD comp_method = (FTL::COMPRESS_METHOD)conf.readInt(CONFIG_FTL, SimpleSSD::FTL::FTL_COMPRESS_METHOD);
+  if(compType==CompressType::NONE){
+    debugprint(LOG_HIL_NVME, "CompressInfo CompressType: NONE.");
+  }
+  else if(compType == CompressType::LZ4){
+    debugprint(LOG_HIL_NVME, "CompressInfo CompressType: LZ4.");
+  }
+  else if(compType == CompressType::LZMA){
+    debugprint(LOG_HIL_NVME, "CompressInfo CompressType: LZMA.");
+  }
+  else{
+    panic("No such compress type, please check your config files.");
+  }
+  if(comp_method == FTL::GC){
+    debugprint(LOG_HIL_NVME, "CompressInfo CompressMethod: GC.");
+  }
+  else if(comp_method == FTL::ONLINE){
+    debugprint(LOG_HIL_NVME, "CompressInfo CompressMethod: ONLINE.");
+    panic("Not implement yet");
+  }
+  else if(comp_method == FTL::OFFLINE){
+    debugprint(LOG_HIL_NVME, "CompressInfo CompressMethod: OFFLINE.");
+    panic("Not implement yet");
+  }
+  else{
+    panic("No such compress method, please check your config files.");
+  }
+}
+
 void Subsystem::init() {
   pHIL = new HIL(conf);
   uint16_t nNamespaces =
@@ -105,6 +136,7 @@ void Subsystem::init() {
       }
     }
   }
+  printCompressInfo();
 }
 
 void Subsystem::convertUnit(Namespace *ns, uint64_t slba, uint64_t nlblk,

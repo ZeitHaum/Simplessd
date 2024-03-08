@@ -41,6 +41,7 @@ typedef enum {
   FTL_GC_EVICT_POLICY,
   FTL_GC_D_CHOICE_PARAM,
   FTL_USE_RANDOM_IO_TWEAK,
+  FTL_COMPRESS_METHOD,
 
   /* N+K Mapping configuration*/
   FTL_NKMAP_N,
@@ -69,6 +70,12 @@ typedef enum {
   POLICY_DCHOICE,
 } EVICT_POLICY;
 
+typedef enum {
+  GC,
+  ONLINE,
+  OFFLINE,
+} COMPRESS_METHOD;
+
 class Config : public BaseConfig {
  private:
   MAPPING mapping;             //!< Default: PAGE_MAPPING
@@ -84,6 +91,7 @@ class Config : public BaseConfig {
   EVICT_POLICY evictPolicy;    //!< Default: POLICY_GREEDY
   uint64_t dChoiceParam;       //!< Default: 3
   bool randomIOTweak;          //!< Default: true
+  COMPRESS_METHOD compressMethod;  //!< Defualt: GC(Not valid if compress is disabled.)
 
  public:
   Config();

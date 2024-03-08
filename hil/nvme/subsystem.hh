@@ -63,6 +63,7 @@ class Subsystem : public AbstractSubsystem {
   bool namespaceManagement(SQEntryWrapper &, RequestFunction &);
   bool namespaceAttachment(SQEntryWrapper &, RequestFunction &);
   bool formatNVM(SQEntryWrapper &, RequestFunction &);
+  void printCompressInfo();
 
  public:
   Subsystem(Controller *, ConfigData &);

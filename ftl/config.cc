@@ -38,6 +38,7 @@ const char NAME_GC_RECLAIM_THRESHOLD[] = "GCReclaimThreshold";
 const char NAME_GC_EVICT_POLICY[] = "EvictPolicy";
 const char NAME_GC_D_CHOICE_PARAM[] = "DChoiceParam";
 const char NAME_USE_RANDOM_IO_TWEAK[] = "EnableRandomIOTweak";
+const char NAME_COMPRESS_METHOD[] = "CompressMethod";
 
 Config::Config() {
   mapping = PAGE_MAPPING;
@@ -53,6 +54,7 @@ Config::Config() {
   evictPolicy = POLICY_GREEDY;
   dChoiceParam = 3;
   randomIOTweak = true;
+  compressMethod = GC;
 }
 
 bool Config::setConfig(const char *name, const char *value) {
@@ -97,6 +99,20 @@ bool Config::setConfig(const char *name, const char *value) {
   else if (MATCH_NAME(NAME_USE_RANDOM_IO_TWEAK)) {
     randomIOTweak = convertBool(value);
   }
+  else if (MATCH_NAME(NAME_COMPRESS_METHOD)) {
+    if(strcmp(value, "GC") == 0){
+      compressMethod = GC;
+    }
+    else if(strcmp(value, "ONLINE") == 0){
+      compressMethod = ONLINE;
+    }
+    else if(strcmp(value, "OFFLINE") == 0){
+      compressMethod = OFFLINE;
+    }
+    else{
+      panic("No such compress method, please check your config files.");
+    }
+  }
   else {
     ret = false;
   }
@@ -134,6 +150,9 @@ int64_t Config::readInt(uint32_t idx) {
       break;
     case FTL_GC_EVICT_POLICY:
       ret = evictPolicy;
+      break;
+    case FTL_COMPRESS_METHOD:
+      ret = compressMethod;
       break;
   }
 
