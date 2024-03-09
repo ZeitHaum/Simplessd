@@ -49,25 +49,25 @@ class PageMapping : public AbstractFTL {
     void copy(const PhysicalAddress& p);
   };
   //declare private struct.
-  struct CopyInfo{
+  struct CompressInfo{
     uint64_t lpn;
     uint32_t new_len;// new write len;
     uint32_t old_len;// old write len;
     PhysicalAddress invalidate_addr;
     uint8_t* changed_data = nullptr;
     uint64_t disk_idx = 0;
-    CopyInfo();
-    CopyInfo(uint64_t, uint32_t, uint32_t, PhysicalAddress);
+    CompressInfo();
+    CompressInfo(uint64_t, uint32_t, uint32_t, PhysicalAddress);
   };
-  struct CopyRequest{
-    std::vector<std::vector<CopyInfo>> copy_infos;
-    std::vector<uint32_t> lens;// calculate the total lens of copy data.
+  struct CompressRequest{
+    std::vector<std::vector<CompressInfo>> compress_infos;
+    std::vector<uint32_t> lens;// calculate the total lens of compress data.
     std::vector<uint16_t> counts;// calculate the counts of every ioUnit
     Parameter* param;
-    CopyRequest(Parameter* p);
+    CompressRequest(Parameter* p);
     void clear();
-    void addCopyInfo(CopyInfo copy_info,  uint32_t idx);
-    void merge(CopyRequest& copy_req);
+    void addCompressInfo(CompressInfo compress_info,  uint32_t idx);
+    void merge(CompressRequest& compress_req);
     bool empty();
   };
   struct MapEntry{
@@ -94,7 +94,7 @@ class PageMapping : public AbstractFTL {
   uint32_t nFreeBlocks;  // For some libraries which std::list::size() is O(n)
   std::vector<uint32_t> lastFreeBlock;
   Bitset lastFreeBlockIOMap;
-  CopyRequest nowCopyReq;
+  CompressRequest nowCompressReq;
   uint32_t lastFreeBlockIndex;
 
   bool bReclaimMore;
@@ -121,12 +121,12 @@ class PageMapping : public AbstractFTL {
   float freeBlockRatio();
   uint32_t convertBlockIdx(uint32_t);
   uint32_t getFreeBlock(uint32_t);
-  bool isAvailable(const CopyRequest& copy_req);
+  bool isAvailable(const CompressRequest& compress_req);
   uint32_t getLastFreeBlock(Bitset&);
   void calculateVictimWeight(std::vector<std::pair<uint32_t, float>> &,
                              const EVICT_POLICY, uint64_t);
   void selectVictimBlock(std::vector<uint32_t> &, uint64_t &);
-  void getCompressedLengthFromDisk(uint64_t, uint32_t,const MapEntry&, CopyInfo&, uint64_t&);
+  void getCompressedLengthFromDisk(uint64_t, uint32_t,const MapEntry&, CompressInfo&, uint64_t&);
   void doGarbageCollection(std::vector<uint32_t> &, uint64_t &);  
 
   float calculateWearLeveling();
@@ -134,7 +134,7 @@ class PageMapping : public AbstractFTL {
 
   void readInternal(Request &, uint64_t &);
   void writeInternal(Request &, uint64_t &, bool = true);
-  void copySubmit(PAL::Request&, std::vector<PAL::Request>&, Bitset&,  uint64_t&);
+  void compressSubmit(PAL::Request&, std::vector<PAL::Request>&, Bitset&,  uint64_t&);
   void trimInternal(Request &, uint64_t &);
   void eraseInternal(PAL::Request &, uint64_t &);
   BlockStat calculateBlockStat();  
