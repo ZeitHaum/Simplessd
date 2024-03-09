@@ -616,6 +616,10 @@ void PageMapping::getCompressedLengthFromDisk(uint64_t lpn, uint32_t idx, const 
         copy_info.changed_data = new uint8_t[param.ioUnitSize];
         copy_info.disk_idx = disk_offset / param.ioUnitSize;
         bool is_comp = pcDisk -> compressBufferWrite(copy_info.disk_idx,CompressedLength, compressedBuffer, copy_info.changed_data);
+        //apply Compress Latency
+        if(pcDisk->getCompressType()==CompressType::LZ4){
+          applyLatency(CPU::FTL__PAGE_MAPPING, CPU::COMPRESS_UNIT_LZ4);
+        }
         if(is_comp){
           // debugprint(LOG_FTL_PAGE_MAPPING, "Compressed Trigged In GC! pageIndex =%" PRIu64 ", idx = %" PRIu64, pageIndex, idx);
         }
@@ -806,6 +810,10 @@ void PageMapping::readInternal(Request &req, uint64_t &tick) {
           if(mapping.is_compressed == 0x1){
             // Actual decompress trigged in HIL layer.
             ++stat.decompressCount;
+            CompressedDisk* pcDisk = ((CompressedDisk*)(cd_info.pDisk));
+            if(pcDisk->getCompressType()==CompressType::LZ4){
+              applyLatency(CPU::FTL__PAGE_MAPPING, CPU::DECOMPRESS_UNIT_LZ4);
+            }
             debugprint(LOG_FTL_PAGE_MAPPING,("Compressed info: IsCompressed = " + std::to_string(mapping.is_compressed) + ", C_IND = "+ std::to_string(mapping.paddr.compressunitIndex) + ", OFFSET = "+ std::to_string(mapping.offset) + ", LENGTH = " + std::to_string(mapping.length)).c_str());
           }
 

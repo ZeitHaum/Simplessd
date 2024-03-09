@@ -327,6 +327,14 @@ CPU::CPU(ConfigReader &c) : conf(c), lastResetStat(0) {
       {39, InstStat(18, 76, 11, 39, 0, 0, clockPeriod)});
   cpi.find(12)->second.insert(
       {40, InstStat(35, 140, 22, 69, 0, 0, clockPeriod)});
+  /** 
+   * New added Compress and decompress latency, measured in actual benchmark.
+   * Notice: We don't model the detailed instruction distribution, So all instrutions' latency here is regarded as othre insts. 
+  */
+  cpi.find(1)->second.insert(
+      {43, InstStat(0, 0, 0, 0, 0, 7740, clockPeriod)});
+  cpi.find(1)->second.insert(
+      {44, InstStat(0, 0, 0, 0, 0, 1773, clockPeriod)});
 }
 
 CPU::~CPU() {}
