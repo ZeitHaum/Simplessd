@@ -52,12 +52,8 @@ class PageMapping : public AbstractFTL {
   struct CompressInfo{
     uint64_t lpn;
     uint32_t new_len;// new write len;
-    uint32_t old_len;// old write len;
-    PhysicalAddress invalidate_addr;
-    uint8_t* changed_data = nullptr;
-    uint64_t disk_idx = 0;
     CompressInfo();
-    CompressInfo(uint64_t, uint32_t, uint32_t, PhysicalAddress);
+    CompressInfo(uint64_t, uint32_t);
   };
   struct CompressRequest{
     std::vector<std::vector<CompressInfo>> compress_infos;
@@ -69,19 +65,22 @@ class PageMapping : public AbstractFTL {
     void addCompressInfo(CompressInfo compress_info,  uint32_t idx);
     void merge(CompressRequest& compress_req);
     bool empty();
+    void update(uint32_t idx, uint32_t comp_ind);
   };
   struct MapEntry{
     PhysicalAddress paddr;
     uint64_t is_compressed : 1;
     uint64_t is_actual : 1;// Check for whether has actual data, used for calculate compress ratio, default is true;
-    uint64_t offset : 31;
-    uint64_t length : 31;
+    uint64_t is_buffered : 1;// Check for whether data is in buffer. Only valid in online compress scheme.
+    uint64_t offset : 30;
+    uint64_t length : 30;
+    //unused 1 bit
     MapEntry():
-      paddr(PhysicalAddress()), is_compressed(0), is_actual(1),offset(0), length(0)
+      paddr(PhysicalAddress()), is_compressed(0), is_actual(1), is_buffered(0), offset(0), length(0)
     {}
     //writeInternal specal adjust
     MapEntry(uint32_t bid, uint32_t pid, uint16_t cid, bool is_c, uint32_t off, uint32_t len):
-      paddr(PhysicalAddress(bid, pid, cid)), is_compressed(is_c), is_actual(1),offset(off), length(len)
+      paddr(PhysicalAddress(bid, pid, cid)), is_compressed(is_c), is_actual(1), is_buffered(0), offset(off), length(len)
     {}
   };
   PAL::PAL *pPAL;
