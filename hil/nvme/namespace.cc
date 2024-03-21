@@ -326,8 +326,20 @@ void Namespace::write(SQEntryWrapper &req, RequestFunction &func) {
           pContext->function(pContext->resp);
 
           if (pContext->buffer) {
+            //Use for debug.
+            // bool is_allzero = true;
+            // for(uint32_t i = 0; i<pContext->nlb; ++i){
+            //   for(uint32_t j = 0; j<pDisk->getSectorSize() * i; ++j){
+            //     if(*(pContext->buffer + j) != 0){
+            //       is_allzero = false;
+            //     }
+            //   }
+            //   if(is_allzero){
+            //     warn("Try to write allzero bytes into disk.");
+            //   }
+            // }
             pDisk->write(pContext->slba, pContext->nlb, pContext->buffer);
-
+            
             free(pContext->buffer);
           }
 
@@ -352,6 +364,20 @@ void Namespace::write(SQEntryWrapper &req, RequestFunction &func) {
                             context);
       }
 
+      //Do actual I/O first.
+      // //Use for debug.
+      // bool is_allzero = true;
+      // for(uint32_t i = 0; i<pContext->nlb; ++i){
+      //   for(uint32_t j = 0; j<pDisk->getSectorSize() * i; ++j){
+      //     if(*(pContext->buffer + j) != 0){
+      //       is_allzero = false;
+      //     }
+      //   }
+      //   if(is_allzero){
+      //     warn("Try to write allzero bytes into disk.");
+      //   }
+      // }
+
       pParent->write(this, pContext->slba, pContext->nlb, dmaDone, context);
     };
 
@@ -359,7 +385,7 @@ void Namespace::write(SQEntryWrapper &req, RequestFunction &func) {
 
     pContext->beginAt = getTick();
     pContext->slba = slba;
-    pContext->nlb = nlb;
+    pContext->nlb = nlb;                                                                                                                              
 
     CPUContext *pCPU =
         new CPUContext(doRead, pContext, CPU::NVME__NAMESPACE, CPU::WRITE);
@@ -435,14 +461,13 @@ void Namespace::read(SQEntryWrapper &req, RequestFunction &func) {
       pContext->tick = tick;
       pContext->beginAt = 0;
 
-      pParent->read(this, pContext->slba, pContext->nlb, dmaDone, pContext);
-
       pContext->buffer = (uint8_t *)calloc(pContext->nlb, info.lbaSize);
-
+      //Do actual I/O first.
       if (pDisk) {
-        debugprint(LOG_HIL_NVME, "READ OCCURED IN LINE 440!");
         pDisk->read(pContext->slba, pContext->nlb, pContext->buffer);
       }
+
+      pParent->read(this, pContext->slba, pContext->nlb, dmaDone, pContext);
 
       pContext->dma->write(0, pContext->nlb * info.lbaSize, pContext->buffer,
                            dmaDone, context);
@@ -540,16 +565,17 @@ void Namespace::compare(SQEntryWrapper &req, RequestFunction &func) {
       pContext->tick = tick;
       pContext->beginAt = 0;
 
-      pParent->read(this, pContext->slba, pContext->nlb, dmaDone, pContext);
 
       pContext->buffer = (uint8_t *)calloc(pContext->nlb, info.lbaSize);
       pContext->hostContent = (uint8_t *)calloc(pContext->nlb, info.lbaSize);
 
+      //Do actual I/O first.
       if (pDisk) {
-        debugprint(LOG_HIL_NVME, "READ OCCURED IN LINE 545!");
         pDisk->read(pContext->slba, pContext->nlb, pContext->buffer);
       }
 
+      pParent->read(this, pContext->slba, pContext->nlb, dmaDone, pContext);
+      
       pContext->dma->read(0, pContext->nlb * info.lbaSize,
                           pContext->hostContent, dmaDone, context);
     };

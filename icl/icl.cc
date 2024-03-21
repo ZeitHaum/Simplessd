@@ -168,6 +168,10 @@ void ICL::format(LPNRange &range, uint64_t &tick) {
   tick += applyLatency(CPU::ICL, CPU::FORMAT);
 }
 
+void ICL::compressOffline(uint64_t& tick){
+  pFTL->compressOffline(tick);
+}
+
 void ICL::getLPNInfo(uint64_t &t, uint32_t &s) {
   t = totalLogicalPages;
   s = logicalPageSize;

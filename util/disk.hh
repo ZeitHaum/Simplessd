@@ -58,6 +58,7 @@ class Disk {
   virtual uint64_t writeOrdinary(uint64_t, uint64_t, uint8_t *);
   virtual uint16_t erase(uint64_t, uint16_t);
   CompressType getCompressType();
+  uint32_t getSectorSize();
 };
 
 class CoWDisk : public Disk {

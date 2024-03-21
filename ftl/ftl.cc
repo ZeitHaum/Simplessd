@@ -125,6 +125,12 @@ void FTL::resetStatValues() {
   pPAL->resetStatValues();
 }
 
+void FTL::compressOffline(uint64_t& tick) {
+  debugprint(LOG_FTL, "Begin compress Offline in FTL.");
+
+  pFTL->compressOffline(tick);
+}
+
 }  // namespace FTL
 
 }  // namespace SimpleSSD

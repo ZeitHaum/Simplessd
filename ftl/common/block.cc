@@ -523,6 +523,9 @@ void Block::invalidate(uint32_t pageIndex, uint16_t idx, uint16_t c_ind, uint32_
       //update blockstat
       updateStatInvalidate(len);
     }
+    else{
+      panic("Try to invalidate an invalidated unit.");
+    }
     cvalidBits.at(pageIndex).at(idx).reset(c_ind);
   }
   if(!isvalid(pageIndex, idx)){

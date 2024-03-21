@@ -147,7 +147,10 @@ typedef enum {
   OPCODE_GET_BAD_BLOCK_TABLE = 0xF2,
 
   // OpenChannel SSD 2.0
-  OPCODE_GEOMETRY = 0xE2
+  OPCODE_GEOMETRY = 0xE2,
+
+  //This OpCode is added by Compressor in SSD, used to trigger compress frontend.
+  OPCODE_OFFLINE_COMPRESS = 0x1F,
 } ADMIN_OPCODE;
 
 typedef enum {

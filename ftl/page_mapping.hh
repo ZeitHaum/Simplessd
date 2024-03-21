@@ -52,8 +52,11 @@ class PageMapping : public AbstractFTL {
   struct CompressInfo{
     uint64_t lpn;
     uint32_t new_len;// new write len;
+    //Below information are used to invalidate.
+    uint32_t old_len;
+    PhysicalAddress invalidate_addr;
     CompressInfo();
-    CompressInfo(uint64_t, uint32_t);
+    CompressInfo(uint64_t, uint32_t, uint32_t, PhysicalAddress);
   };
   struct CompressRequest{
     std::vector<std::vector<CompressInfo>> compress_infos;
@@ -94,6 +97,7 @@ class PageMapping : public AbstractFTL {
   std::vector<uint32_t> lastFreeBlock;
   Bitset lastFreeBlockIOMap;
   CompressRequest nowCompressReq;
+  std::vector<Bitset> nowBuffedInvalidateReq;
   uint32_t lastFreeBlockIndex;
 
   bool bReclaimMore;
@@ -150,6 +154,8 @@ class PageMapping : public AbstractFTL {
   void trim(Request &, uint64_t &) override;
 
   void format(LPNRange &, uint64_t &) override;
+
+  void compressOffline(uint64_t&) override;
 
   Status *getStatus(uint64_t, uint64_t) override;
 

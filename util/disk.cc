@@ -179,6 +179,10 @@ uint16_t Disk::erase(uint64_t, uint16_t nlblk) {
   return nlblk;
 }
 
+uint32_t Disk::getSectorSize(){
+  return sectorSize;
+}
+
 CompressType Disk::getCompressType(){
   return compType;
 }
@@ -536,7 +540,6 @@ bool CompressedDisk::compressBufferWrite(uint64_t idx, uint64_t& dest_len, uint8
 uint16_t CompressedDisk::erase(uint64_t, uint16_t nlblk) {
   return nlblk;
 }
-
 
 uint64_t CompressedDisk::getCompressedLength(uint64_t idx){
   uint64_t ret = 0;

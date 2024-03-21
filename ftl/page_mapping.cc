@@ -55,8 +55,8 @@ void PageMapping::PhysicalAddress::copy(const PhysicalAddress& p){
 
 PageMapping::CompressInfo::CompressInfo(){}
 
-PageMapping::CompressInfo::CompressInfo(uint64_t _lpn, uint32_t _new_len)
-:lpn(_lpn), new_len(_new_len)
+PageMapping::CompressInfo::CompressInfo(uint64_t _lpn, uint32_t _new_len, uint32_t _old_len, PhysicalAddress _addr)
+:lpn(_lpn), new_len(_new_len), old_len(_old_len), invalidate_addr(_addr)
 {}
 
 PageMapping::CompressRequest::CompressRequest(Parameter* p){
@@ -116,6 +116,10 @@ PageMapping::PageMapping(ConfigReader &c, Parameter &p, PAL::PAL *l,
   blocks.reserve(param.totalPhysicalBlocks);
   table.reserve(param.totalLogicalBlocks * param.pagesInBlock);
   compressedBuffer = new uint8_t[param.ioUnitSize];
+  nowBuffedInvalidateReq.resize(param.ioUnitInPage);
+  for(uint32_t i = 0; i< nowBuffedInvalidateReq.size(); ++i){
+    nowBuffedInvalidateReq.at(i) = Bitset(param.maxCompressUnitInPage);
+  }
 
   for (uint32_t i = 0; i < param.totalPhysicalBlocks; i++) {
     freeBlocks.emplace_back(Block(i, param.pagesInBlock, param.ioUnitInPage));
@@ -326,6 +330,11 @@ void PageMapping::format(LPNRange &range, uint64_t &tick) {
       // Do trim
       for (uint32_t idx = 0; idx < bitsetSize; idx++) {
         MapEntry &mapping = mappingList.at(idx);
+        if(mapping.is_buffered == 0x1){
+          //Not in block, erase nowCompressIndex instead.
+          nowBuffedInvalidateReq[idx].set(mapping.paddr.compressunitIndex);
+          continue;
+        }
         auto block = blocks.find(mapping.paddr.blockIndex);
 
         if (block == blocks.end()) {
@@ -688,11 +697,8 @@ void PageMapping::doGarbageCollection(std::vector<uint32_t> &blocksToReclaim,
               }
               pDRAM->read(&(*mappingList), (sizeof(MapEntry)) * param.ioUnitInPage, tick);
               MapEntry& mapping = mappingList->second.at(idx);
-              //Invalidate
-              auto& old_block = blocks.find(mapping.paddr.blockIndex)->second;
-              old_block.invalidate(mapping.paddr.pageIndex, idx, mapping.paddr.compressunitIndex, (uint32_t)mapping.length);
-              CompressInfo compress_info = {lpn, param.ioUnitSize};
-              if((COMPRESS_METHOD)conf.readInt(CONFIG_FTL,FTL_COMPRESS_METHOD) == COMPRESS_METHOD::GC){
+              CompressInfo compress_info = {lpn, param.ioUnitSize, (uint32_t)mapping.length, mapping.paddr};
+              if((COMPRESS_METHOD)conf.readInt(CONFIG_FTL,FTL_COMPRESS_METHOD) == COMPRESS_METHOD::GC || (COMPRESS_METHOD)conf.readInt(CONFIG_FTL,FTL_COMPRESS_METHOD) == COMPRESS_METHOD::OFFLINE){
                 //Need Compress
                 getCompressedLengthFromDisk(lpn, idx, mapping, compress_info, tick);
               }
@@ -884,11 +890,6 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
     if (req.ioFlag.test(idx) || !bRandomTweak) {
       //May Need compress
       MapEntry& mapping = mappingList->second.at(idx);
-      //invalidate
-      if(mapping.paddr.blockIndex< (uint32_t)param.totalPhysicalBlocks){
-        auto& old_block = blocks.find(mapping.paddr.blockIndex)->second;
-        old_block.invalidate(mapping.paddr.pageIndex, idx, mapping.paddr.compressunitIndex, (uint32_t)mapping.length);
-      }
       if(mapping.is_compressed){
         ++stat.overwriteCompressUnitCount;
       }
@@ -898,7 +899,7 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
       else{
         mapping.is_actual = 0x1;
       }
-      CompressInfo compress_info = {req.lpn, param.ioUnitSize};
+      CompressInfo compress_info = {req.lpn, param.ioUnitSize, param.ioUnitSize, mapping.paddr};
       if(compMethod == COMPRESS_METHOD::ONLINE){
         //Need Compress
         getCompressedLengthFromDisk(req.lpn, idx, mapping, compress_info, tick);
@@ -915,6 +916,7 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
       else{
         compress_req.addCompressInfo(compress_info, idx);
         mapping.is_buffered = 0x1;
+        mapping.paddr.compressunitIndex = compress_req.counts[idx] - 1;
       }
     }
   }
@@ -1076,6 +1078,20 @@ void PageMapping::writeInternal(Request &req, uint64_t &tick, bool sendToPAL) {
       panic("ftl: GC triggered while in initialization");
     }
 
+    //Force to Submit(Avoid influenced by writeInternal.)
+    if(!nowCompressReq.empty()){
+      compressSubmit(palRequest, writeRequests, iomap, tick);
+      //Handle writeRequest
+      for(auto& iter: writeRequests){
+        beginAt = tick;
+
+        pPAL->write(iter, beginAt);
+
+        finishedAt = max(tick, finishedAt);
+      }
+      tick = finishedAt;
+    }
+
     std::vector<uint32_t> list;
       uint64_t beginAt = tick;
 
@@ -1129,19 +1145,32 @@ void PageMapping::compressSubmit(PAL::Request& req, std::vector<PAL::Request>& w
       // Update mapping table
       uint32_t now_off = 0;
       for(uint32_t j = 0; j<nowCompressReq.counts[idx]; ++j){
-        CompressInfo& compress_info = nowCompressReq.compress_infos[idx][j];
-        MapEntry& mapping = table.find(compress_info.lpn)->second.at(idx);
-        mapping.paddr.blockIndex = freeBlock.getBlockIndex();
-        mapping.paddr.pageIndex = newPgaeIdx;
-        mapping.paddr.compressunitIndex = j;
-        mapping.is_compressed = (compress_info.new_len< param.ioUnitSize);
-        mapping.length = compress_info.new_len;
-        mapping.offset = now_off;
-        mapping.is_buffered = 0x0;
-        now_off += compress_info.new_len;
-        write_lpns.push_back(compress_info.lpn);
-        write_lens.push_back(compress_info.new_len);
-        stat.validPageCopies++;//invalid
+        if(!nowBuffedInvalidateReq[idx].test(j)){
+          CompressInfo& compress_info = nowCompressReq.compress_infos[idx][j];
+          MapEntry& mapping = table.find(compress_info.lpn)->second.at(idx);
+          mapping.paddr.blockIndex = freeBlock.getBlockIndex();
+          mapping.paddr.pageIndex = newPgaeIdx;
+          mapping.paddr.compressunitIndex = j;
+          mapping.is_compressed = (compress_info.new_len< param.ioUnitSize);
+          mapping.length = compress_info.new_len;
+          mapping.offset = now_off;
+          mapping.is_buffered = 0x0;
+          //invalidate old_addr if need
+          if(compress_info.invalidate_addr.blockIndex < (uint32_t)param.totalPhysicalBlocks){
+            auto& old_block = blocks.find(compress_info.invalidate_addr.blockIndex)->second;
+            old_block.invalidate(compress_info.invalidate_addr.pageIndex, idx, compress_info.invalidate_addr.compressunitIndex, compress_info.old_len);
+            now_off += compress_info.new_len;
+          }
+          else{
+            //New write block, no need to invalidate.
+          }
+          write_lpns.push_back(compress_info.lpn);
+          write_lens.push_back(compress_info.new_len);
+          stat.validPageCopies++;//invalid
+        }
+        else{
+          nowBuffedInvalidateReq[idx].reset(j);
+        }
       }
       freeBlock.write(newPgaeIdx, write_lpns, write_lens, idx, tick);
     }
@@ -1165,7 +1194,8 @@ void PageMapping::trimInternal(Request &req, uint64_t &tick) {
     for (uint32_t idx = 0; idx < bitsetSize; idx++) {
       MapEntry &mapping = mappingList->second.at(idx);
       if(mapping.is_buffered == 0x1){
-        //Not in block, doNothing.
+        //Not in block, erase nowCompressIndex instead.
+        nowBuffedInvalidateReq[idx].set(mapping.paddr.compressunitIndex);
         continue;
       }
       auto block = blocks.find(mapping.paddr.blockIndex);
@@ -1239,6 +1269,29 @@ void PageMapping::eraseInternal(PAL::Request &req, uint64_t &tick) {
   blocks.erase(block);
 
   tick += applyLatency(CPU::FTL__PAGE_MAPPING, CPU::ERASE_INTERNAL);
+}
+
+void PageMapping::compressOffline(uint64_t& tick){
+  //Compress and Write In all blocks.
+  uint64_t cnt = 0;
+  uint64_t totalBlock_cnt = blocks.size();
+  std::vector<uint32_t> compressBlocks;
+  for(auto& iter : blocks){
+    if(iter.second.getNextWritePageIndex() != param.pagesInBlock){
+      //If is reserve block, can not compress.
+      continue;
+    }
+    compressBlocks.push_back(iter.second.getBlockIndex());
+  }
+  for(auto& iter: compressBlocks){
+    std::vector<uint32_t> tmp{iter};
+    doGarbageCollection(tmp, tick);
+    ++cnt;
+    if(cnt == 10){
+      //Test Version
+      break;
+    }
+  }
 }
 
 float PageMapping::calculateWearLeveling() {

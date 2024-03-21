@@ -79,11 +79,10 @@ void Subsystem::printCompressInfo(){
   }
   else if(comp_method == FTL::ONLINE){
     debugprint(LOG_HIL_NVME, "CompressInfo CompressMethod: ONLINE.");
-    panic("Not implement yet");
   }
   else if(comp_method == FTL::OFFLINE){
     debugprint(LOG_HIL_NVME, "CompressInfo CompressMethod: OFFLINE.");
-    panic("Not implement yet");
+    // panic("Not implement yet");
   }
   else{
     panic("No such compress method, please check your config files.");
@@ -402,6 +401,7 @@ void Subsystem::submitCommand(SQEntryWrapper &req, RequestFunction func) {
         processed = getFeatures(req, func);
         break;
       case OPCODE_ASYNC_EVENT_REQ:
+        // processed = asyncEventReq(req, func);
         break;
       case OPCODE_NAMESPACE_MANAGEMENT:
         processed = namespaceManagement(req, func);
@@ -411,6 +411,9 @@ void Subsystem::submitCommand(SQEntryWrapper &req, RequestFunction func) {
         break;
       case OPCODE_FORMAT_NVM:
         processed = formatNVM(req, func);
+        break;
+      case OPCODE_OFFLINE_COMPRESS:
+        processed = compressOffline(req, func);
         break;
       default:
         resp.makeStatus(true, false, TYPE_GENERIC_COMMAND_STATUS,
@@ -474,6 +477,49 @@ void Subsystem::getNVMCapacity(uint64_t &total, uint64_t &used) {
 
 uint32_t Subsystem::validNamespaceCount() {
   return (uint32_t)lNamespaces.size();
+}
+
+bool Subsystem::compressOffline(SQEntryWrapper &req, RequestFunction &func){
+  CQEntryWrapper resp(req);
+  //firstly Flush for every namesapce
+  IOContext *pContext = new IOContext(func, resp);
+
+  pContext->beginAt = getTick();
+
+  if(lNamespaces.size() != 1){
+    panic("Not support: the number of namespaces is not one.");
+  }
+
+
+  Namespace* ns = *lNamespaces.begin();
+  
+  //CompressOffline
+  DMAFunction doCompressOffline= [this](uint64_t now, void *context) {
+    IOContext *pContext = (IOContext *)context;
+    debugprint(
+        LOG_HIL_NVME,
+        "NVM     | COMPRESS_OFFLINE | CQ %u | SQ %u:%u | CID %u  | %" PRIu64
+        " - %" PRIu64 " (%" PRIu64 ")",
+        pContext->resp.cqID, pContext->resp.entry.dword2.sqID,
+        pContext->resp.sqUID, pContext->resp.entry.dword3.commandID, 
+        pContext->beginAt, now, now - pContext->beginAt);
+
+    pContext->function(pContext->resp);
+
+    delete pContext;
+  };
+
+  //Only one namespace, equal All Pages.
+  Request hil_req(doCompressOffline, pContext);
+  Namespace::Information *info = ns->getInfo();
+
+  hil_req.range.slpn = info->range.slpn;
+  hil_req.range.nlp = info->range.nlp;
+  hil_req.offset = 0;
+  hil_req.length = info->range.nlp * logicalPageSize;
+
+  pHIL->compressOffline(hil_req);
+  return true;
 }
 
 void Subsystem::read(Namespace *ns, uint64_t slba, uint64_t nlblk,
@@ -988,6 +1034,11 @@ bool Subsystem::getFeatures(SQEntryWrapper &req, RequestFunction &func) {
 
 bool Subsystem::asyncEventReq(SQEntryWrapper &, RequestFunction &) {
   // FIXME: Not implemented
+  // debugprint(LOG_HIL_NVME, "Trigged unimplemented command asyncEventReq in SimpleSSD, regarded as trigged offline compress.");
+  // // Do OFFLINE COMPRESS HERE if needed.
+  // CQEntryWrapper resp(req);
+  // resp.makeStatus(true, false, TYPE_GENERIC_COMMAND_STATUS, STATUS_SUCCESS);
+  // func(resp);
   return true;
 }
 

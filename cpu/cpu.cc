@@ -335,6 +335,9 @@ CPU::CPU(ConfigReader &c) : conf(c), lastResetStat(0) {
       {43, InstStat(0, 0, 0, 0, 0, 7740, clockPeriod)});
   cpi.find(1)->second.insert(
       {44, InstStat(0, 0, 0, 0, 0, 1773, clockPeriod)});
+  //HIL COMPRESS_OFFLINE, The time Need be revised.
+  cpi.find(4)->second.insert(
+      {45, InstStat(0, 0, 0, 0, 0, 99, clockPeriod)});
 }
 
 CPU::~CPU() {}

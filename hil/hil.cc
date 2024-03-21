@@ -101,6 +101,30 @@ void HIL::write(Request &req) {
   execute(CPU::HIL, CPU::WRITE, doWrite, new Request(req));
 }
 
+void HIL::compressOffline(Request& req){
+  DMAFunction doCompressOffline = [this](uint64_t tick, void *context) {
+    auto pReq = (Request *)context;
+
+    pReq->reqID = ++reqCount;
+
+    debugprint(LOG_HIL, "FLUSH | REQ %7u | LCA %" PRIu64 " + %" PRIu64,
+               pReq->reqID, pReq->range.slpn, pReq->range.nlp);
+
+    pICL->flush(pReq->range, tick);
+    
+    pICL->compressOffline(tick);
+
+    pReq->finishedAt = tick;
+    completionQueue.push(*pReq);
+
+    updateCompletion();
+
+    delete pReq;
+  };
+  execute(CPU::HIL, CPU::COMPRESS_OFFLINE, doCompressOffline, new Request(req));
+}
+
+
 void HIL::flush(Request &req) {
   DMAFunction doFlush = [this](uint64_t tick, void *context) {
     auto pReq = (Request *)context;

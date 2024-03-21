@@ -60,6 +60,7 @@ class HIL : public StatObject {
   void write(Request &);
   void flush(Request &);
   void trim(Request &);
+  void compressOffline(Request&);
 
   void format(Request &, bool);
 
